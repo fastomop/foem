@@ -24,8 +24,6 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 
 # Install dependencies
 pip install psycopg2-binary python-dotenv
-# or, if you have a requirements file:
-# pip install -r requirements.txt
 ```
 
 ## Configuration
