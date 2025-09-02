@@ -1,6 +1,9 @@
 # foem
 FastOMOP Evaluation and Monitoring
 
+### ⚠️ Under development
+This project is a work in progress.
+
 ## Overview
 **foem** (FastOMOP Evaluation and Monitoring) is a Python toolkit for evaluating and monitoring OMOP (Observational Medical Outcomes Partnership) databases. It automates SQL test generation, template-based query construction, and result aggregation for clinical data analysis.
 
