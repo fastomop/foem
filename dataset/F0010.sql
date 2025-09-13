@@ -1,39 +1,80 @@
+WITH 
+-- Get source concept for first drug
+drug1_source AS (
+    SELECT concept_id
+    FROM concept
+    WHERE vocabulary_id = %(v_id1)s
+    AND concept_code = %(d_id1)s
+),
+
+-- Map first drug to standard concept
+drug1_mapped AS (
+    SELECT concept_id_2 AS concept_id
+    FROM drug1_source ds
+    JOIN concept_relationship cr ON ds.concept_id = cr.concept_id_1
+    WHERE cr.relationship_id = 'Maps to'
+),
+
+-- Get all descendant concepts for first drug
+drug1_concepts AS (
+    SELECT DISTINCT ca.descendant_concept_id AS concept_id
+    FROM drug1_mapped dm
+    JOIN concept c ON dm.concept_id = c.concept_id
+    JOIN concept_ancestor ca ON c.concept_id = ca.ancestor_concept_id
+),
+
+-- Get source concept for second drug
+drug2_source AS (
+    SELECT concept_id
+    FROM concept
+    WHERE vocabulary_id = %(v_id2)s
+    AND concept_code = %(d_id2)s
+),
+
+-- Map second drug to standard concept
+drug2_mapped AS (
+    SELECT concept_id_2 AS concept_id
+    FROM drug2_source ds
+    JOIN concept_relationship cr ON ds.concept_id = cr.concept_id_1
+    WHERE cr.relationship_id = 'Maps to'
+),
+
+-- Get all descendant concepts for second drug
+drug2_concepts AS (
+    SELECT DISTINCT ca.descendant_concept_id AS concept_id
+    FROM drug2_mapped dm
+    JOIN concept c ON dm.concept_id = c.concept_id
+    JOIN concept_ancestor ca ON c.concept_id = ca.ancestor_concept_id
+),
+
+-- Get source concept for third drug
+drug3_source AS (
+    SELECT concept_id
+    FROM concept
+    WHERE vocabulary_id = %(v_id3)s
+    AND concept_code = %(d_id3)s
+),
+
+-- Map third drug to standard concept
+drug3_mapped AS (
+    SELECT concept_id_2 AS concept_id
+    FROM drug3_source ds
+    JOIN concept_relationship cr ON ds.concept_id = cr.concept_id_1
+    WHERE cr.relationship_id = 'Maps to'
+),
+
+-- Get all descendant concepts for third drug
+drug3_concepts AS (
+    SELECT DISTINCT ca.descendant_concept_id AS concept_id
+    FROM drug3_mapped dm
+    JOIN concept c ON dm.concept_id = c.concept_id
+    JOIN concept_ancestor ca ON c.concept_id = ca.ancestor_concept_id
+)
+
 SELECT COUNT(DISTINCT dr1.person_id)
-            FROM ((drug_exposure AS dr1 JOIN (SELECT descendant_concept_id AS concept_id
-                                                FROM (SELECT *
-                                                      FROM (SELECT concept_id_2
-                                                            FROM ((SELECT concept_id
-                                                                        FROM concept
-                                                                        WHERE vocabulary_id = %(v_id1)s
-                                                                        AND (concept_code = %(d_id1)s)) as cci JOIN (SELECT concept_id_1, concept_id_2
-                                                                                                            FROM concept_relationship
-                                                                                                            WHERE relationship_id = 'Maps to') AS alias1
-                                                                  ON concept_id = concept_id_1)) as c
-                                                                  JOIN concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
-                  ON dr1.drug_concept_id = concept_id) JOIN (drug_exposure AS dr2 JOIN (SELECT descendant_concept_id AS concept_id
-                                                                                                FROM (SELECT *
-                                                                                                      FROM (SELECT concept_id_2
-                                                                                                            FROM ((SELECT concept_id
-                                                                                                                  FROM concept
-                                                                                                                  WHERE vocabulary_id = %(v_id2)s
-                                                                                                                  AND (concept_code = %(d_id2)s)) as cci2 JOIN (SELECT concept_id_1, concept_id_2
-                                                                                                                                                      FROM concept_relationship
-                                                                                                                                                      WHERE relationship_id = 'Maps to') AS alias2
-                                                                                                                  ON concept_id = concept_id_1)) as i
-                                                                                                            JOIN concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                                                      JOIN concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
-                                                            ON dr2.drug_concept_id = concept_id) ON dr1.person_id = dr2.person_id)
-                  JOIN (drug_exposure AS dr3 JOIN (SELECT descendant_concept_id AS concept_id
-                                                            FROM (SELECT *
-                                                                  FROM (SELECT concept_id_2
-                                                                        FROM ((SELECT concept_id
-                                                                              FROM concept
-                                                                              WHERE vocabulary_id = %(v_id3)s
-                                                                              AND (concept_code = %(d_id3)s)) as cci3 JOIN (SELECT concept_id_1, concept_id_2
-                                                                                                                  FROM concept_relationship
-                                                                                                                  WHERE relationship_id = 'Maps to') AS alias3
-                                                                              ON concept_id = concept_id_1)) as ccia3ci2
-                                                                        JOIN concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
-                                                                  JOIN concept_ancestor ON concept_id = ancestor_concept_id) as "ccia3ci2c*caci"
-                        ON dr3.drug_concept_id = concept_id) ON dr2.person_id = dr3.person_id;
+FROM drug_exposure dr1
+JOIN drug1_concepts d1 ON dr1.drug_concept_id = d1.concept_id
+JOIN drug_exposure dr2 ON dr1.person_id = dr2.person_id
+JOIN drug2_concepts d2 ON dr2.drug_concept_id = d2.concept_id
+JOIN drug_exposure dr3 ON dr2.person_id = dr3.person_id
+JOIN drug3_concepts d3 ON dr3.drug_concept_id = d3.concept_id;
