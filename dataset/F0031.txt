@@ -1,0 +1,1 @@
+How many people were taking drug <ARG-DRUG><0> in year <ARG-TIMEYEARS><0>.

@@ -1,0 +1,1 @@
+Number of patients of specific gender <ARG-GENDER><0>.

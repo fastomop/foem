@@ -1,0 +1,1 @@
+How many people have treated by drug <ARG-DRUG><0> followed by drug <ARG-DRUG><1>?
