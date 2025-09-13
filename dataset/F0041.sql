@@ -3,7 +3,7 @@ SELECT
     et.ethnicity,
     COUNT(DISTINCT pe1.person_id)
 FROM ((
-    person AS pe1 JOIN (
+    person AS pe1 INNER JOIN (
         SELECT
             concept_id,
             concept_name AS race
@@ -11,7 +11,7 @@ FROM ((
         WHERE domain_id = 'Race' AND standard_concept = 'S'
     ) AS rt
         ON pe1.race_concept_id = rt.concept_id
-) JOIN
+) INNER JOIN
     (SELECT
         concept_id,
         concept_name AS ethnicity

@@ -3,7 +3,7 @@ SELECT
     st.state,
     COUNT(DISTINCT pe1.person_id)
 FROM ((
-    person AS pe1 JOIN (
+    person AS pe1 INNER JOIN (
         SELECT
             concept_id,
             concept_name AS ethnicity
@@ -11,7 +11,7 @@ FROM ((
         WHERE domain_id = 'Ethnicity' AND standard_concept = 'S'
     ) AS et
         ON pe1.ethnicity_concept_id = et.concept_id
-) JOIN (SELECT
+) INNER JOIN (SELECT
     location_id,
     state
 FROM location) AS st

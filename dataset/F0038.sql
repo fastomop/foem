@@ -3,7 +3,7 @@ SELECT
     year_of_birth,
     COUNT(DISTINCT pe1.person_id)
 FROM (
-    person AS pe1 JOIN (
+    person AS pe1 INNER JOIN (
         SELECT
             concept_id,
             concept_name AS ethnicity
