@@ -80,7 +80,7 @@ class Template:
                                                                                           FROM {schema}.concept_relationship
                                                                                           WHERE relationship_id = 'Maps to') AS alias1
                                                 ON concept_id = concept_id_1)) as c
-                                                JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
+                                                JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
                                           JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) AS d1
                               ON dr1.drug_concept_id = concept_id) AS a
                   JOIN (SELECT dr2.person_id, dr2.drug_exposure_start_date AS start_date
@@ -95,7 +95,7 @@ class Template:
                                                                                                 FROM {schema}.concept_relationship
                                                                                                 WHERE relationship_id = 'Maps to') AS alias2
                                                             ON concept_id = concept_id_1)) as i
-                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
+                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
                                                 JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) AS d2
                                     ON dr2.drug_concept_id = concept_id) AS b ON a.person_id = b.person_id
             WHERE CAST(EXTRACT(epoch FROM CAST(GREATEST(a.start_date, b.start_date) AS TIMESTAMP) -
@@ -121,8 +121,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                   ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON dr1.drug_concept_id = concept_id) JOIN ({schema}.drug_exposure AS dr2 JOIN (SELECT descendant_concept_id AS concept_id
                                                                                                 FROM (SELECT *
                                                                                                       FROM (SELECT concept_id_2
@@ -133,15 +133,15 @@ class Template:
                                                                                                                                                       FROM {schema}.concept_relationship
                                                                                                                                                       WHERE relationship_id = 'Maps to') AS alias2
                                                                                                                   ON concept_id = concept_id_1)) as i
-                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                                                             ON dr2.drug_concept_id = concept_id)
                   ON dr1.person_id = dr2.person_id);
             """.replace("{schema}", self.schema)
 
         return sql, {"v_id1": v_id1, "d_id1": d_id1, "v_id2": v_id2, "d_id2": d_id2}
     
-    def patients_2drugs_or(self, v_id1, v_id2, d_id1, d_id2):
+    def patients_2drugs_or(self, v_id1, d_id1, v_id2, d_id2):
         """
         Counts of patients taking drug <ARG-DRUG><0> or <ARG-DRUG><1>.
         """
@@ -158,7 +158,7 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                   ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
                                                             JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)
                                                 UNION
                                                 (SELECT descendant_concept_id AS concept_id
@@ -171,8 +171,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias2
                                                                   ON concept_id = concept_id_1)) as i
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)) as "ccia1ci2c*caciccia2ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)) as ccia1ci2ccaciccia2ci2ccaci
                   ON dr1.drug_concept_id = concept_id);
             """.replace("{schema}", self.schema)
 
@@ -196,8 +196,8 @@ class Template:
                                                                                           FROM {schema}.concept_relationship
                                                                                           WHERE relationship_id = 'Maps to') AS alias1
                                                 ON concept_id = concept_id_1)) as i
-                                                JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                          JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                          JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                               ON dr1.drug_concept_id = concept_id) AS a
                   JOIN (SELECT dr2.person_id, dr2.drug_exposure_start_date AS start_date
                         FROM {schema}.drug_exposure AS dr2
@@ -211,8 +211,8 @@ class Template:
                                                                                                 FROM {schema}.concept_relationship
                                                                                                 WHERE relationship_id = 'Maps to') AS alias2
                                                             ON concept_id = concept_id_1)) as ccia2ci2
-                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                                     ON dr2.drug_concept_id = concept_id) AS b ON a.person_id = b.person_id
                   JOIN (SELECT dr3.person_id, dr3.drug_exposure_start_date AS start_date
                         FROM {schema}.drug_exposure AS dr3
@@ -226,8 +226,8 @@ class Template:
                                                                                                 FROM {schema}.concept_relationship
                                                                                                 WHERE relationship_id = 'Maps to') AS alias3
                                                             ON concept_id = concept_id_1)) as ccia3ci2
-                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
-                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia3ci2c*caci"
+                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia3ci2c
+                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia3ci2ccaci
                                     ON dr3.drug_concept_id = concept_id) AS c ON b.person_id = c.person_id
                   JOIN (SELECT dr4.person_id, dr4.drug_exposure_start_date AS start_date
                         FROM {schema}.drug_exposure AS dr4
@@ -241,8 +241,8 @@ class Template:
                                                                                                 FROM {schema}.concept_relationship
                                                                                                 WHERE relationship_id = 'Maps to') AS alias4
                                                             ON concept_id = concept_id_1)) as ccia4ci2
-                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia4ci2c*"
-                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia4ci2c*caci"
+                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia4ci2c
+                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia4ci2ccaci
                                     ON dr4.drug_concept_id = concept_id) AS d ON c.person_id = d.person_id
             WHERE CAST(EXTRACT(epoch FROM CAST(GREATEST(a.start_date, b.start_date, c.start_date, d.start_date) AS TIMESTAMP) -
                                           CAST(LEAST(a.start_date, b.start_date, c.start_date, d.start_date) AS TIMESTAMP)) /
@@ -268,8 +268,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                         ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON dr1.drug_concept_id = concept_id) JOIN ({schema}.drug_exposure AS dr2 JOIN (SELECT descendant_concept_id AS concept_id
                                                                                                 FROM (SELECT *
                                                                                                       FROM (SELECT concept_id_2
@@ -280,8 +280,8 @@ class Template:
                                                                                                                                                       FROM {schema}.concept_relationship
                                                                                                                                                       WHERE relationship_id = 'Maps to') AS alias2
                                                                                                                   ON concept_id = concept_id_1)) as i
-                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                                                             ON dr2.drug_concept_id = concept_id)
                   ON dr1.person_id = dr2.person_id) JOIN ({schema}.drug_exposure AS dr3 JOIN (SELECT descendant_concept_id AS concept_id
                                                                                           FROM (SELECT *
@@ -293,8 +293,8 @@ class Template:
                                                                                                                                                 FROM {schema}.concept_relationship
                                                                                                                                                 WHERE relationship_id = 'Maps to') AS alias3
                                                                                                             ON concept_id = concept_id_1)) as ccia3ci2
-                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
-                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia3ci2c*caci"
+                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia3ci2c
+                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia3ci2ccaci
                                                       ON dr3.drug_concept_id = concept_id) ON dr2.person_id = dr3.person_id)
                   JOIN ({schema}.drug_exposure AS dr4 JOIN (SELECT descendant_concept_id AS concept_id
                                                             FROM (SELECT *
@@ -306,8 +306,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias4
                                                                               ON concept_id = concept_id_1)) as ccia4ci2
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia4ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia4ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia4ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia4ci2ccaci
                         ON dr4.drug_concept_id = concept_id) ON dr3.person_id = dr4.person_id;
             """.replace("{schema}", self.schema)
 
@@ -330,7 +330,7 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias1
                                                                         ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
                                                             JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)
                                                       UNION
                                                       (SELECT descendant_concept_id AS concept_id
@@ -343,7 +343,7 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias2
                                                                         ON concept_id = concept_id_1)) as i
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
                                                             JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id))
                                                 UNION
                                                 (SELECT descendant_concept_id AS concept_id
@@ -356,7 +356,7 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias3
                                                                         ON concept_id = concept_id_1)) as ccia3ci2
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia3ci2c
                                                             JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id))
                                                 UNION
                                                 (SELECT descendant_concept_id AS concept_id
@@ -369,8 +369,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias4
                                                                   ON concept_id = concept_id_1)) as ccia4ci2
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia4ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)) as "ccia1ci2c*caciccia2ci2c*caciccia3ci2c*caciccia4ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia4ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)) as ccia1ci2ccaciccia2ci2ccaciccia3ci2ccaciccia4ci2ccaci
                   ON dr1.drug_concept_id = concept_id);
             """.replace("{schema}", self.schema)
 
@@ -395,8 +395,8 @@ class Template:
                                                                                           FROM {schema}.concept_relationship
                                                                                           WHERE relationship_id = 'Maps to') AS alias1
                                                 ON concept_id = concept_id_1)) as i
-                                                JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                          JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                          JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                               ON dr1.drug_concept_id = concept_id) AS a
                   JOIN (SELECT dr2.person_id, dr2.drug_exposure_start_date AS start_date
                         FROM {schema}.drug_exposure AS dr2
@@ -410,8 +410,8 @@ class Template:
                                                                                                 FROM {schema}.concept_relationship
                                                                                                 WHERE relationship_id = 'Maps to') AS alias2
                                                             ON concept_id = concept_id_1)) as ccia2ci2
-                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                                     ON dr2.drug_concept_id = concept_id) AS b ON a.person_id = b.person_id
                   JOIN (SELECT dr3.person_id, dr3.drug_exposure_start_date AS start_date
                         FROM {schema}.drug_exposure AS dr3
@@ -425,8 +425,8 @@ class Template:
                                                                                                 FROM {schema}.concept_relationship
                                                                                                 WHERE relationship_id = 'Maps to') AS alias3
                                                             ON concept_id = concept_id_1)) as ccia3ci2
-                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
-                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia3ci2c*caci"
+                                                      JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia3ci2c
+                                                JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia3ci2ccaci
                                     ON dr3.drug_concept_id = concept_id) AS c ON b.person_id = c.person_id
             WHERE CAST(EXTRACT(epoch FROM CAST(GREATEST(a.start_date, b.start_date, c.start_date) AS TIMESTAMP) -
                                           CAST(LEAST(a.start_date, b.start_date, c.start_date) AS TIMESTAMP)) / 86400 AS BIGINT) <= %(days)s;
@@ -451,8 +451,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                   ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON dr1.drug_concept_id = concept_id) JOIN ({schema}.drug_exposure AS dr2 JOIN (SELECT descendant_concept_id AS concept_id
                                                                                                 FROM (SELECT *
                                                                                                       FROM (SELECT concept_id_2
@@ -463,8 +463,8 @@ class Template:
                                                                                                                                                       FROM {schema}.concept_relationship
                                                                                                                                                       WHERE relationship_id = 'Maps to') AS alias2
                                                                                                                   ON concept_id = concept_id_1)) as i
-                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                                                             ON dr2.drug_concept_id = concept_id) ON dr1.person_id = dr2.person_id)
                   JOIN ({schema}.drug_exposure AS dr3 JOIN (SELECT descendant_concept_id AS concept_id
                                                             FROM (SELECT *
@@ -476,8 +476,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias3
                                                                               ON concept_id = concept_id_1)) as ccia3ci2
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia3ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia3ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia3ci2ccaci
                         ON dr3.drug_concept_id = concept_id) ON dr2.person_id = dr3.person_id;
             """.replace("{schema}", self.schema)
 
@@ -500,7 +500,7 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                         ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
                                                             JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)
                                                 UNION
                                                 (SELECT descendant_concept_id AS concept_id
@@ -513,7 +513,7 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias2
                                                                         ON concept_id = concept_id_1)) as i
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
                                                             JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id))
                                                 UNION
                                                 (SELECT descendant_concept_id AS concept_id
@@ -526,8 +526,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias3
                                                                   ON concept_id = concept_id_1)) as ccia3ci2
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia3ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)) as "ccia1ci2c*caciccia2ci2c*caciccia3ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia3ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id)) as ccia1ci2ccaciccia2ci2ccaciccia3ci2ccaci
                   ON dr1.drug_concept_id = concept_id);
             """.replace("{schema}", self.schema)
 
@@ -1408,8 +1408,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias1
                                                                               ON concept_id = concept_id_1)) as c
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON con1.condition_concept_id = concept_id)
                   JOIN ({schema}.condition_occurrence AS con2 JOIN (SELECT descendant_concept_id AS concept_id
                                                                   FROM (SELECT *
@@ -1421,8 +1421,8 @@ class Template:
                                                                                                                               FROM {schema}.concept_relationship
                                                                                                                               WHERE relationship_id = 'Maps to') AS alias2
                                                                                     ON concept_id = concept_id_1)) as i
-                                                                                    JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                              JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                                    JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                              JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                         ON con2.condition_concept_id = concept_id) ON con1.person_id = con2.person_id AND CAST(EXTRACT(epoch FROM
                                                                                                                         CAST(con1.condition_start_date AS TIMESTAMP) -
                                                                                                                         CAST(con2.condition_start_date AS TIMESTAMP)) / 86400 AS BIGINT) > %(days)s;
@@ -1616,8 +1616,8 @@ class Template:
                                                                               FROM {schema}.concept_relationship
                                                                               WHERE relationship_id = 'Maps to') AS alias1
                                           ON concept_id = concept_id_1)) as c
-                                          JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                    JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                          JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                    JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                         ON con1.condition_concept_id = concept_id
             WHERE EXTRACT(year FROM con1.condition_start_date) = %(year)s;
             """.replace("{schema}", self.schema)
@@ -1641,8 +1641,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                   ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON dr1.drug_concept_id = concept_id)
                   JOIN ({schema}.drug_exposure AS dr2 JOIN (SELECT descendant_concept_id AS concept_id
                                                             FROM (SELECT *
@@ -1654,8 +1654,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias2
                                                                               ON concept_id = concept_id_1)) as i
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                         ON dr2.drug_concept_id = concept_id) ON dr1.person_id = dr2.person_id AND CAST(EXTRACT(epoch FROM
                                                                                                                   CAST(dr1.drug_exposure_start_date AS TIMESTAMP) -
                                                                                                                   CAST(dr2.drug_exposure_start_date AS TIMESTAMP)) / 86400 AS BIGINT) > %(days)s;
@@ -1680,8 +1680,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                   ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON dr1.drug_concept_id = concept_id)
                   JOIN ({schema}.drug_exposure AS dr2 JOIN (SELECT descendant_concept_id AS concept_id
                                                             FROM (SELECT *
@@ -1693,8 +1693,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias2
                                                                               ON concept_id = concept_id_1)) as i
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                         ON dr2.drug_concept_id = concept_id) ON dr1.person_id = dr2.person_id AND CAST(EXTRACT(epoch FROM
                                                                                                                   CAST(dr2.drug_exposure_start_date AS TIMESTAMP) -
                                                                                                                   CAST(dr1.drug_exposure_start_date AS TIMESTAMP)) / 86400 AS BIGINT) > 0;
@@ -1724,8 +1724,8 @@ class Template:
                                                                                                                         FROM {schema}.concept_relationship
                                                                                                                         WHERE relationship_id = 'Maps to') AS alias2
                                                                                     ON concept_id = concept_id_1)) as c
-                                                                              JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                        JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci" JOIN {schema}.condition_occurrence AS con1
+                                                                              JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                        JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci JOIN {schema}.condition_occurrence AS con1
                                                                   ON concept_id = con1.condition_concept_id)
                   ON pe1.person_id = con1.person_id);
             """.replace("{schema}", self.schema)
@@ -1749,8 +1749,8 @@ class Template:
                                                                                                             FROM {schema}.concept_relationship
                                                                                                             WHERE relationship_id = 'Maps to') AS alias1
                                                                   ON concept_id = concept_id_1)) as c
-                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON dr1.drug_concept_id = concept_id)
             WHERE EXTRACT(year FROM dr1.drug_exposure_start_date) <= %(year)s
             AND EXTRACT(year FROM dr1.drug_exposure_end_date) >= %(year)s;
@@ -1775,8 +1775,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias1
                                                                               ON concept_id = concept_id_1)) as c
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON con1.condition_concept_id = concept_id)
                   JOIN ({schema}.drug_exposure AS dr1 JOIN (SELECT descendant_concept_id AS concept_id
                                                             FROM (SELECT *
@@ -1788,8 +1788,8 @@ class Template:
                                                                                                                         FROM {schema}.concept_relationship
                                                                                                                         WHERE relationship_id = 'Maps to') AS alias2
                                                                               ON concept_id = concept_id_1)) as i
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                         ON dr1.drug_concept_id = concept_id)
                         ON con1.person_id = dr1.person_id AND con1.condition_start_date < dr1.drug_exposure_start_date;
             """.replace("{schema}", self.schema)
@@ -1813,8 +1813,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias1
                                                                               ON concept_id = concept_id_1)) as c
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON con1.condition_concept_id = concept_id)
                   JOIN ({schema}.drug_exposure AS dr1 JOIN (SELECT descendant_concept_id AS concept_id
                                                             FROM (SELECT *
@@ -1826,8 +1826,8 @@ class Template:
                                                                                                                         FROM {schema}.concept_relationship
                                                                                                                         WHERE relationship_id = 'Maps to') AS alias2
                                                                               ON concept_id = concept_id_1)) as i
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                         ON dr1.drug_concept_id = concept_id) ON con1.person_id = dr1.person_id AND CAST(EXTRACT(epoch FROM
                                                                                                                   CAST(dr1.drug_exposure_start_date AS TIMESTAMP) -
                                                                                                                   CAST(con1.condition_start_date AS TIMESTAMP)) / 86400 AS BIGINT) > %(days)s;
@@ -1857,8 +1857,8 @@ class Template:
                                                                                                                                                             FROM {schema}.concept_relationship
                                                                                                                                                             WHERE relationship_id = 'Maps to') AS alias2
                                                                                                                         ON concept_id = concept_id_1)) as c
-                                                                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia2ci2c*"
-                                                                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia2ci2c*caci"
+                                                                                                                  JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia2ci2c
+                                                                                                            JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia2ci2ccaci
                                                             ON co.condition_concept_id = concept_id) AS pe2
                   ON pe1.person_id = pe2.person_id);
             """.replace("{schema}", self.schema)
@@ -2154,8 +2154,8 @@ class Template:
                                                                                                       FROM {schema}.concept_relationship
                                                                                                       WHERE relationship_id = 'Maps to') AS alias1
                                                             ON concept_id = concept_id_1)) as c
-                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci" JOIN {schema}.drug_exposure AS dr1
+                                                            JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                      JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci JOIN {schema}.drug_exposure AS dr1
                                           ON concept_id = drug_concept_id) ON pe1.person_id = dr1.person_id);
             """.replace("{schema}", self.schema)
 
@@ -2178,8 +2178,8 @@ class Template:
                                                                                                                   FROM {schema}.concept_relationship
                                                                                                                   WHERE relationship_id = 'Maps to') AS alias1
                                                                               ON concept_id = concept_id_1)) as c
-                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                                                        JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                                                  JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                   ON con1.condition_concept_id = concept_id);
             """.replace("{schema}", self.schema)
 
@@ -2217,8 +2217,8 @@ class Template:
                                                                               FROM {schema}.concept_relationship
                                                                               WHERE relationship_id = 'Maps to') AS alias1
                                           ON concept_id = concept_id_1)) as c
-                                          JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                    JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                          JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                    JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                         ON con1.condition_concept_id = concept_id
             GROUP BY EXTRACT(year FROM con1.condition_start_date);
             """.replace("{schema}", self.schema)
@@ -2243,8 +2243,8 @@ class Template:
                                                                                     FROM {schema}.concept_relationship
                                                                                     WHERE relationship_id = 'Maps to') AS alias1
                                           ON concept_id = concept_id_1)) as c
-                                          JOIN {schema}.concept ON concept_id_2 = concept_id) as "ccia1ci2c*"
-                                    JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as "ccia1ci2c*caci"
+                                          JOIN {schema}.concept ON concept_id_2 = concept_id) as ccia1ci2c
+                                    JOIN {schema}.concept_ancestor ON concept_id = ancestor_concept_id) as ccia1ci2ccaci
                         ON dr1.drug_concept_id = concept_id
             GROUP BY EXTRACT(year FROM dr1.drug_exposure_start_date);
             """.replace("{schema}", self.schema)

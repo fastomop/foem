@@ -1,5 +1,5 @@
 import psycopg2  # or psycopg
-from old.template_old import Templates
+from template import Templates
 from config import get_db_connection
 
 def finalize_sql(sql: str, params: dict, conn) -> str:

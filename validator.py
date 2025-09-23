@@ -252,60 +252,12 @@ class SqlTest:
         LIMIT 20;
         """
 
-        """
-        Control check query: 
-        WITH terfenadine AS (
-        SELECT descendant_concept_id AS concept_id
-        FROM concept c
-        JOIN concept_relationship cr
-            ON c.concept_id = cr.concept_id_1
-        JOIN concept c_std
-            ON cr.concept_id_2 = c_std.concept_id
-        AND cr.relationship_id = 'Maps to'
-        JOIN concept_ancestor ca
-            ON ca.ancestor_concept_id = c_std.concept_id
-        WHERE c.vocabulary_id = '<VOCABULARY>'           -- vocabulary
-        AND c.concept_code = '<DRUG-CODE>'          -- code for your drug
-        ),
-        lisinopril AS (
-            SELECT descendant_concept_id AS concept_id
-            FROM concept c
-            JOIN concept_relationship cr
-                ON c.concept_id = cr.concept_id_1
-            JOIN concept c_std
-                ON cr.concept_id_2 = c_std.concept_id
-            AND cr.relationship_id = 'Maps to'
-            JOIN concept_ancestor ca
-                ON ca.ancestor_concept_id = c_std.concept_id
-            WHERE c.vocabulary_id = '<VOCABULARY>'           -- vocabulary
-            AND c.concept_code = '<DRUG-CODE>'         -- code for your drug
-        ),
-        drug_set AS (
-            SELECT concept_id FROM terfenadine
-            UNION
-            SELECT concept_id FROM lisinopril
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0} or {1}.",
+            self.templates.patients_2drugs_or
         )
-        SELECT COUNT(DISTINCT de.person_id) AS person_count
-        FROM drug_exposure de
-        JOIN drug_set ds
-        ON de.drug_concept_id = ds.concept_id;
-        """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        for d1, d2 in result:
-            text = f"""
-            Counts of patients taking drug {d1} or {d2}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            query, params = self.templates.patients_2drugs_or(v_id1, v_id2, d_id1, d_id2)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
 
     def patients_4drugs_and_time(self):
 
@@ -2029,12 +1981,18 @@ class SqlTest:
     def patients_gender_state(self):
         
         text = """
-            Number of patients by gender and state.
+            
             """
         
         query, params = self.templates.patients_gender_state()
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients by gender and state.",
+            self.templates.patients_gender_state()
+        )
 
     def patients_group_by_ethnicity_location(self):
 
@@ -2333,5 +2291,5 @@ class SqlTest:
 
 
 test = SqlTest()
-test.patients_2drugs_and_time()
+test.patients_condition_time_condition()
 # test.patients_2drugs_and()
