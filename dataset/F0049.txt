@@ -1,0 +1,1 @@
+Number of patients of ethnicity <ARG-ETHNICITY><0>.

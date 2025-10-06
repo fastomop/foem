@@ -1,0 +1,1 @@
+Counts of patients taking drug <ARG-DRUG><0>, <ARG-DRUG><1>, or <ARG-DRUG><2>.
