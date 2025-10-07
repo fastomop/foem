@@ -2,6 +2,7 @@ from template import Template
 from config import get_db_connection
 from typing import Dict
 from contextlib import contextmanager
+import re
 
 class SqlTest:
 
@@ -305,7 +306,6 @@ class SqlTest:
         c2.concept_name AS drug2_name,
         c3.concept_name AS drug3_name,
         c4.concept_name AS drug4_name
-        -- q.person_count AS person_count
         FROM quads q
         JOIN concept c1 ON c1.concept_id = q.drug1_concept_id
         JOIN concept c2 ON c2.concept_id = q.drug2_concept_id
@@ -314,26 +314,13 @@ class SqlTest:
         ORDER BY q.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3, d4 in result:
-            text = f"""
-            Counts of patients taking drug {d1}, {d2}, {d3} and {d4} within 30 days.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            v_id4, d_id4 = self.templates.find_code_by_name(d4, self.vocab_dict)
-            query, params = self.templates.patients_4drugs_and_time(v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4, 30)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0}, {1}, {2} and {3} within 30 days.",
+            self.templates.patients_4drugs_and_time,
+            30
+        )
 
     def patients_4drugs_and(self):
 
@@ -374,7 +361,6 @@ class SqlTest:
         c2.concept_name AS drug2_name,
         c3.concept_name AS drug3_name,
         c4.concept_name AS drug4_name
-        -- q.person_count AS person_count
         FROM quads q
         JOIN concept c1 ON c1.concept_id = q.drug1_concept_id
         JOIN concept c2 ON c2.concept_id = q.drug2_concept_id
@@ -383,26 +369,12 @@ class SqlTest:
         ORDER BY q.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3, d4 in result:
-            text = f"""
-            Counts of patients taking drug {d1}, {d2}, {d3} and {d4}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            v_id4, d_id4 = self.templates.find_code_by_name(d4, self.vocab_dict)
-            query, params = self.templates.patients_4drugs_and(v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0}, {1}, {2} and {3}.",
+            self.templates.patients_4drugs_and
+        )
 
     def patients_4drugs_or(self):
 
@@ -486,26 +458,12 @@ class SqlTest:
         GROUP BY sq.drug1, c1.concept_name, sq.drug2, c2.concept_name, sq.drug3, c3.concept_name, sq.drug4, c4.concept_name
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3, d4 in result:
-            text = f"""
-            Counts of patients taking drug {d1}, {d2}, {d3} or {d4}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            v_id4, d_id4 = self.templates.find_code_by_name(d4, self.vocab_dict)
-            query, params = self.templates.patients_4drugs_or(v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0}, {1}, {2} or {3}.",
+            self.templates.patients_4drugs_or
+        )
 
     def patients_3drugs_and_time(self):
 
@@ -548,7 +506,6 @@ class SqlTest:
         c1.concept_name AS drug1_name,
         c2.concept_name AS drug2_name,
         c3.concept_name AS drug3_name
-        -- t.person_count AS person_count
         FROM triples t
         JOIN concept c1 ON c1.concept_id = t.drug1_concept_id
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
@@ -556,25 +513,13 @@ class SqlTest:
         ORDER BY t.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3 in result:
-            text = f"""
-            Counts of patients taking drug {d1}, {d2} and {d3} within 30 days.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            query, params = self.templates.patients_3drugs_and_time(v_id1, v_id2, v_id3, d_id1, d_id2, d_id3, 30)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0}, {1} and {2} within 30 days.",
+            self.templates.patients_3drugs_and_time,
+            30
+        )
 
     def patients_3drugs_and(self):
 
@@ -610,7 +555,6 @@ class SqlTest:
         c1.concept_name AS drug1_name,
         c2.concept_name AS drug2_name,
         c3.concept_name AS drug3_name
-        -- t.person_count AS person_count
         FROM triples t
         JOIN concept c1 ON c1.concept_id = t.drug1_concept_id
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
@@ -618,25 +562,12 @@ class SqlTest:
         ORDER BY t.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3 in result:
-            text = f"""
-            Counts of patients taking drug {d1}, {d2} and {d3}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            query, params = self.templates.patients_3drugs_and(v_id1, v_id2, v_id3, d_id1, d_id2, d_id3)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0}, {1} and {2}.",
+            self.templates.patients_3drugs_and
+        )
 
     def patients_3drugs_or(self):
 
@@ -699,25 +630,12 @@ class SqlTest:
         ORDER BY s.patient_count
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3 in result:
-            text = f"""
-            Counts of patients taking drug {d1}, {d2} or {d3}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            query, params = self.templates.patients_3drugs_or(v_id1, v_id2, v_id3, d_id1, d_id2, d_id3)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0}, {1} or {2}.",
+            self.templates.patients_3drugs_or
+        )
 
     def patients_2conditions_and_time(self):
 
@@ -765,7 +683,6 @@ class SqlTest:
         SELECT
         c1.concept_name AS condition1_name,
         c2.concept_name AS condition2_name
-        -- pc.patient_count AS patient_count
         FROM pair_counts pc
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
@@ -779,17 +696,12 @@ class SqlTest:
             cur.execute(query)
             result = cur.fetchall()
 
-        print(result)
-
-        for d1, d2 in result:
-            text = f"""
-            Counts of patients with condition {d1} and {d2} within 30 days.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            query, params = self.templates.patients_2conditions_and_time(v_id1, v_id2, d_id1, d_id2, 30)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        return self._process_results(
+            result,
+            "Counts of patients with condition {0} and {1} within 30 days.",
+            self.templates.patients_2conditions_and_time,
+            30
+        )
 
     def patients_2conditions_and(self):
         
@@ -834,31 +746,18 @@ class SqlTest:
         SELECT
             c1.concept_name AS condition1_name,
             c2.concept_name AS condition2_name
-            -- pc.patient_count AS patient_count
         FROM pair_counts pc
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2 in result:
-            text = f"""
-            Counts of patients with condition {d1} and {d2}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            query, params = self.templates.patients_2conditions_and(v_id1, v_id2, d_id1, d_id2)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0} and {1}.",
+            self.templates.patients_2conditions_and
+        )
     
     def patients_2conditions_or(self):
 
@@ -916,32 +815,18 @@ class SqlTest:
         SELECT
             c1.concept_name AS condition1_name,
             c2.concept_name AS condition2_name
-            -- COUNT(DISTINCT sp.person_id) AS patient_count
         FROM separate_pairs sp
         JOIN concept c1 ON c1.concept_id = sp.cond1
         JOIN concept c2 ON c2.concept_id = sp.cond2
         GROUP BY sp.cond1, c1.concept_name, sp.cond2, c2.concept_name
-        -- ORDER BY patient_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2 in result:
-            text = f"""
-            Counts of patients with condition {d1} or {d2}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            query, params = self.templates.patients_2conditions_or(v_id1, v_id2, d_id1, d_id2)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0} or {1}.",
+            self.templates.patients_2conditions_or
+        )
 
     def patients_4conditions_and_time(self):
 
@@ -998,26 +883,13 @@ class SqlTest:
         ORDER BY q.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3, d4 in result:
-            text = f"""
-            Counts of patients with condition {d1}, {d2}, {d3} and {d4} within <ARG-TIMEDAYS><0> days.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            v_id4, d_id4 = self.templates.find_code_by_name(d4, self.vocab_dict)
-            query, params = self.templates.patients_4conditions_and_time(v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4, 1000)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0}, {1}, {2} and {3} within 1000 days.",
+            self.templates.patients_4conditions_and_time,
+            1000
+        )
 
     def patients_4conditions_and(self):
 
@@ -1071,26 +943,12 @@ class SqlTest:
         ORDER BY q.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3, d4 in result:
-            text = f"""
-            Counts of patients with condition {d1}, {d2}, {d3} and {d4}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            v_id4, d_id4 = self.templates.find_code_by_name(d4, self.vocab_dict)
-            query, params = self.templates.patients_4conditions_and(v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0}, {1}, {2} and {3}.",
+            self.templates.patients_4conditions_and
+        )
 
     def patients_4conditions_or(self):
 
@@ -1179,26 +1037,12 @@ class SqlTest:
         sq.cond4, c4.concept_name
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3, d4 in result:
-            text = f"""
-            Counts of patients with condition {d1}, {d2}, {d3} or {d4}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            v_id4, d_id4 = self.templates.find_code_by_name(d4, self.vocab_dict)
-            query, params = self.templates.patients_4conditions_or(v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0}, {1}, {2} or {3}.",
+            self.templates.patients_4conditions_or
+        )
 
     def patients_3conditions_and_time(self): #check the chronic pain problem, cause it is a observation and not condition
 
@@ -1241,7 +1085,6 @@ class SqlTest:
         c1.concept_name AS condition1_name,
         c2.concept_name AS condition2_name,
         c3.concept_name AS condition3_name
-        -- t.person_count   AS patient_count
         FROM triads t
         JOIN concept c1 ON c1.concept_id = t.cond1_concept_id
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
@@ -1249,25 +1092,13 @@ class SqlTest:
         ORDER BY t.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3 in result:
-            text = f"""
-            Counts of patients with condition {d1}, {d2} and {d3} within 30 days.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            query, params = self.templates.patients_3conditions_and_time(v_id1, v_id2, v_id3, d_id1, d_id2, d_id3, 30)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0}, {1} and {2} within 300 days.",
+            self.templates.patients_3conditions_and_time,
+            300
+        )
 
     def patients_3conditions_and(self):
 
@@ -1317,25 +1148,12 @@ class SqlTest:
         ORDER BY t.person_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3 in result:
-            text = f"""
-            Counts of patients with condition {d1}, {d2} and {d3}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            query, params = self.templates.patients_3conditions_and(v_id1, v_id2, v_id3, d_id1, d_id2, d_id3)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0}, {1} and {2}.",
+            self.templates.patients_3conditions_and
+        )
     
     def patients_3conditions_or(self):
 
@@ -1406,7 +1224,6 @@ class SqlTest:
         c1.concept_name AS condition1_name,
         c2.concept_name AS condition2_name,
         c3.concept_name AS condition3_name
-        -- s.patient_count
         FROM stats s
         JOIN concept c1 ON c1.concept_id = s.cond1
         JOIN concept c2 ON c2.concept_id = s.cond2
@@ -1414,35 +1231,32 @@ class SqlTest:
         ORDER BY s.patient_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2, d3 in result:
-            text = f"""
-            Counts of patients with condition {d1}, {d2} or {d3}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            v_id3, d_id3 = self.templates.find_code_by_name(d3, self.vocab_dict)
-            query, params = self.templates.patients_3conditions_or(v_id1, v_id2, v_id3, d_id1, d_id2, d_id3)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0}, {1} or {2}.",
+            self.templates.patients_3conditions_or
+        )
 
     def patients_distribution_by_birth(self):
-
-        text = """
-            Distribution of patients by year of birth.
-            """
-        
+        """
+        Distribution of patients by year of birth.
+        """
+        text = "Distribution of patients by year of birth."
         query, params = self.templates.patients_distribution_by_birth()
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+        
+        return [{
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }]
 
     def patients_condition_followed_condition(self):
 
@@ -1485,7 +1299,6 @@ class SqlTest:
         SELECT
         c1.concept_name AS condition1_name,
         c2.concept_name AS condition2_name
-        -- COUNT(DISTINCT ap.person_id) as person_count
         FROM adjacent_pairs ap
         JOIN concept c1 ON c1.concept_id = ap.cond1_id
         JOIN concept c2 ON c2.concept_id = ap.cond2_id
@@ -1493,24 +1306,12 @@ class SqlTest:
         ORDER BY COUNT(DISTINCT ap.person_id) DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for c1, c2 in result:
-            text = f"""
-            How many people have Condition {c1} followed by Condition {c2}?
-            """
-            v_id1, c_id1 = self.templates.find_code_by_name(c1, self.vocab_dict)
-            v_id2, c_id2 = self.templates.find_code_by_name(c2, self.vocab_dict)
-            query, params = self.templates.patients_condition_followed_condition(v_id1, v_id2, c_id1, c_id2)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have Condition {0} followed by Condition {1}?",
+            self.templates.patients_condition_followed_condition
+        )
 
     def patients_condition_time_condition(self):
 
@@ -1545,7 +1346,6 @@ class SqlTest:
         SELECT
         c1.concept_name AS condition_a_name,
         c2.concept_name AS condition_b_name
-        -- COUNT(DISTINCT p.person_id) AS patient_count
         FROM pairs p
         JOIN concept c1 ON c1.concept_id = p.cond_a
         JOIN concept c2 ON c2.concept_id = p.cond_b
@@ -1553,24 +1353,13 @@ class SqlTest:
         ORDER BY COUNT(DISTINCT p.person_id) DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for c1, c2 in result:
-            text = f"""
-            How many people have Condition {c2} more than <ARG-TIMEDAYS><0> days after diagnosed by Condition {c1}?
-            """
-            v_id1, c_id1 = self.templates.find_code_by_name(c1, self.vocab_dict)
-            v_id2, c_id2 = self.templates.find_code_by_name(c2, self.vocab_dict)
-            query, params = self.templates.patients_condition_time_condition(v_id1, v_id2, c_id1, c_id2, 30)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have Condition {1} more than 30 days after diagnosed by Condition {0}?",
+            self.templates.patients_condition_time_condition,
+            30
+        )
 
     def patients_condition_age(self):
 
@@ -1781,24 +1570,13 @@ class SqlTest:
         ORDER BY COUNT(DISTINCT p.person_id) DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2 in result:
-            text = f"""
-            How many people have treated by drug {d2} after more than <ARG-TIMEDAYS><0> days of starting with drug {d1}?
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            query, params = self.templates.patients_drug_time_drug(v_id1, v_id2, d_id1, d_id2, 30)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have treated by drug {1} after more than 30 days of starting with drug {0}?",
+            self.templates.patients_drug_time_drug,
+            30
+        )
 
     def patients_drug_followed_drug(self):
 
@@ -2288,8 +2066,3 @@ class SqlTest:
     def patients_group_by_race(self):
 
         pass
-
-
-test = SqlTest()
-test.patients_condition_time_condition()
-# test.patients_2drugs_and()
