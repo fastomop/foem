@@ -1,3 +1,5 @@
+-- Number of patients by gender and state.
+
 WITH gt AS (
     SELECT
         concept_id,

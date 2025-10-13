@@ -1,3 +1,5 @@
+-- counts of patients with taking drug <ARG-DRUG><0> grouped by year of prescription.
+
 WITH 
 -- Get source concept for drug
 drug_source AS (

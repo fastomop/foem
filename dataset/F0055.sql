@@ -1,3 +1,5 @@
+-- counts of patients with condition <ARG-CONDITION><0> grouped by year of diagnosis.
+
 WITH 
 -- Get source concept for condition
 condition_source AS (

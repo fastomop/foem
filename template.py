@@ -267,7 +267,7 @@ class Template:
 
         return sql, {"v_id1": v_id1, "d_id1": d_id1, "v_id2": v_id2, "d_id2": d_id2}
     
-    def patients_4drugs_and_time(self, v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4, days):
+    def patients_4drugs_and_time(self, v_id1, d_id1, v_id2, d_id2, v_id3, d_id3, v_id4, d_id4, days):
         """
         Counts of patients taking drug <ARG-DRUG><0>, <ARG-DRUG><1>, <ARG-DRUG><2> and <ARG-DRUG><3> within <ARG-TIMEDAYS><0> days.
         """
@@ -393,7 +393,7 @@ class Template:
 
         return sql, {"v_id1": v_id1, "d_id1": d_id1, "v_id2": v_id2, "d_id2": d_id2, "v_id3": v_id3, "d_id3": d_id3, "v_id4": v_id4, "d_id4": d_id4, "days": days}
     
-    def patients_4drugs_and(self, v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4):
+    def patients_4drugs_and(self, v_id1, d_id1, v_id2, d_id2, v_id3, d_id3, v_id4, d_id4):
         """
         Counts of patients taking drug <ARG-DRUG><0>, <ARG-DRUG><1>, <ARG-DRUG><2> and <ARG-DRUG><3>.
         """
@@ -497,7 +497,7 @@ class Template:
 
         return sql, {"v_id1": v_id1, "d_id1": d_id1, "v_id2": v_id2, "d_id2": d_id2, "v_id3": v_id3, "d_id3": d_id3, "v_id4": v_id4, "d_id4": d_id4}
     
-    def patients_4drugs_or(self, v_id1, v_id2, v_id3, v_id4, d_id1, d_id2, d_id3, d_id4):
+    def patients_4drugs_or(self, v_id1, d_id1, v_id2, d_id2, v_id3, d_id3, v_id4, d_id4):
         """
         Counts of patients taking drug <ARG-DRUG><0>, <ARG-DRUG><1>, <ARG-DRUG><2> or <ARG-DRUG><3>.
         """

@@ -1,1 +1,0 @@
-Number of patients grouped by year of birth and residence state location.

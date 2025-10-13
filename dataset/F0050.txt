@@ -1,1 +1,0 @@
-Number of patients of race <ARG-RACE><0>.

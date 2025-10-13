@@ -1,3 +1,5 @@
+-- Number of <ARG-GENDER><O> patients with <ARG-CONDITION><O>.
+
 WITH 
 -- Get gender concepts
 gender_concepts AS (

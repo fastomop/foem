@@ -1,3 +1,5 @@
+-- Number of patients grouped by year of birth and gender.
+
 WITH gt AS (
     SELECT
         concept_id,

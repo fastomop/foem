@@ -1,3 +1,5 @@
+-- Counts of patients with condition <ARG-CONDITION><0>, <ARG-CONDITION><1>, <ARG-CONDITION><2> and <ARG-CONDITION><3> within <ARG-TIMEDAYS><0> days.
+
 WITH
             seed_a AS (
             SELECT c.concept_id AS src_id

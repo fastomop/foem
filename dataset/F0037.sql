@@ -1,3 +1,5 @@
+-- Number of patients grouped by ethnicity and residence state location.
+
 WITH 
 ethnicity_concepts AS (
     SELECT

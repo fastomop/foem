@@ -1,3 +1,5 @@
+-- Number of patients grouped by ethnicity.
+
 WITH alias1 AS (
     SELECT
         concept_id,

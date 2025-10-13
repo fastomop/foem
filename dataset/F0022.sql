@@ -1,3 +1,5 @@
+-- How many people have Condition <ARG-CONDITION><0> followed by Condition <ARG-CONDITION><1>?
+
 WITH
             seed_a AS (
             SELECT c.concept_id AS src_id

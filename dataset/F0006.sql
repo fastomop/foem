@@ -1,3 +1,5 @@
+-- Counts of patients taking drug <ARG-DRUG><0>, <ARG-DRUG><1>, <ARG-DRUG><2> and <ARG-DRUG><3> within <ARG-TIMEDAYS><0> days.
+
 WITH 
 -- Get source concept for first drug
 drug1_source AS (

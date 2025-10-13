@@ -1,1 +1,0 @@
-How many people have Condition <ARG-CONDITION><0> followed by Condition <ARG-CONDITION><1>?

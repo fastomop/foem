@@ -1,3 +1,5 @@
+-- Number of patients grouped by race and gender.
+
 SELECT
     rt.race,
     gen_temp1.gender,

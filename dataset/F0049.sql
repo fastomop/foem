@@ -1,3 +1,5 @@
+-- Number of patients of ethnicity <ARG-ETHNICITY><0>.
+
 WITH 
 ethnicity_concepts AS (
     SELECT concept_id

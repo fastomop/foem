@@ -1,3 +1,5 @@
+-- Counts of patients with condition <ARG-CONDITION><0> and <ARG-CONDITION><1>.
+
 WITH 
             seed_a AS
             (SELECT c.concept_id AS src_id

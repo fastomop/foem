@@ -1,3 +1,5 @@
+-- Number of patients of specific gender <ARG-GENDER><0>.
+
 WITH 
 gender_concepts AS (
     SELECT concept_id

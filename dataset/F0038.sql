@@ -1,3 +1,5 @@
+-- Number of patients grouped by ethnicity and year of birth.
+
 SELECT
     ethnicity,
     year_of_birth,

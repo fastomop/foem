@@ -1,3 +1,5 @@
+-- Distribution of patients by year of birth.
+
 SELECT
     pe1.year_of_birth,
     COUNT(DISTINCT pe1.person_id)

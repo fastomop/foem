@@ -1,3 +1,5 @@
+-- How many people have condition <ARG-CONDITION><0> in the year <ARG-TIMEYEARS><0>?
+
 WITH 
 -- Get source concept for condition
 condition_source AS (

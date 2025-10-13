@@ -1,3 +1,5 @@
+-- Counts of patients with condition <ARG-CONDITION><0>, <ARG-CONDITION><1>, or <ARG-CONDITION><2>.
+
 WITH
             seeds(vocabulary_id, concept_code) AS (
             SELECT %(v_id1)s::text, %(c_id1)s::text UNION ALL

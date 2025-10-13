@@ -274,7 +274,8 @@ class SqlTest:
         SELECT DISTINCT
                 de.person_id,
                 de.drug_concept_id,
-                de.drug_exposure_start_date::date AS start_date
+                de.drug_exposure_start_date::date AS start_date,
+                COALESCE(de.drug_exposure_end_date::date, de.drug_exposure_start_date::date) AS end_date
         FROM drug_exposure de
         JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
         ),
@@ -288,16 +289,25 @@ class SqlTest:
         FROM exposures e1
         JOIN exposures e2
             ON e2.person_id = e1.person_id
-        AND e2.drug_concept_id > e1.drug_concept_id
+            AND e2.drug_concept_id > e1.drug_concept_id
+            AND e2.start_date <= e1.end_date
+            AND e2.end_date >= e1.start_date
         JOIN exposures e3
             ON e3.person_id = e1.person_id
-        AND e3.drug_concept_id > e2.drug_concept_id
+            AND e3.drug_concept_id > e2.drug_concept_id
+            AND e3.start_date <= e1.end_date
+            AND e3.end_date >= e1.start_date
+            AND e3.start_date <= e2.end_date
+            AND e3.end_date >= e2.start_date
         JOIN exposures e4
             ON e4.person_id = e1.person_id
-        AND e4.drug_concept_id > e3.drug_concept_id
-        WHERE
-            (GREATEST(e1.start_date, e2.start_date, e3.start_date, e4.start_date)
-            - LEAST(e1.start_date, e2.start_date, e3.start_date, e4.start_date)) <= 30
+            AND e4.drug_concept_id > e3.drug_concept_id
+            AND e4.start_date <= e1.end_date
+            AND e4.end_date >= e1.start_date
+            AND e4.start_date <= e2.end_date
+            AND e4.end_date >= e2.start_date
+            AND e4.start_date <= e3.end_date
+            AND e4.end_date >= e3.start_date
         GROUP BY
             e1.drug_concept_id, e2.drug_concept_id, e3.drug_concept_id, e4.drug_concept_id
         )
@@ -306,6 +316,7 @@ class SqlTest:
         c2.concept_name AS drug2_name,
         c3.concept_name AS drug3_name,
         c4.concept_name AS drug4_name
+        -- ,q.person_count AS patients
         FROM quads q
         JOIN concept c1 ON c1.concept_id = q.drug1_concept_id
         JOIN concept c2 ON c2.concept_id = q.drug2_concept_id

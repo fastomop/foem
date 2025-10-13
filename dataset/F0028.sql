@@ -1,3 +1,5 @@
+-- How many people have treated by drug <ARG-DRUG><0> after more than <ARG-TIMEDAYS><0> days of starting with drug <ARG-DRUG><1>?
+
 WITH 
 -- Get source concept for first drug
 drug1_source AS (

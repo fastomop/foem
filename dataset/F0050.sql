@@ -1,3 +1,5 @@
+-- Number of patients of race <ARG-RACE><0>.
+
 WITH race_concept AS (
     SELECT concept_id
     FROM concept

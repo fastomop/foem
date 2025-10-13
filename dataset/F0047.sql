@@ -1,3 +1,5 @@
+-- Number of patients grouped by year of birth and residence state location.
+
 WITH st AS (
     SELECT
         location_id,

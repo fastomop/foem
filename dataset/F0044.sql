@@ -1,3 +1,5 @@
+-- Number of patients grouped by race and year of birth.
+
 WITH rt AS (
     SELECT
         concept_id,

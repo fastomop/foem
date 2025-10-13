@@ -1,3 +1,5 @@
+-- Number of patients grouped by race and residence state location.
+
 WITH 
 race_concepts AS (
     SELECT

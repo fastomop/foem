@@ -1,3 +1,5 @@
+-- How many people have condition <ARG-CONDITION><0> in the cohort of race <ARG-RACE><0>?
+
 WITH
             race AS (
             SELECT c.concept_id

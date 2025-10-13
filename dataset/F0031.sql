@@ -1,3 +1,5 @@
+-- How many people were taking drug <ARG-DRUG><0> in year <ARG-TIMEYEARS><0>.
+
 WITH 
 -- Get source concept for drug
 drug_source AS (

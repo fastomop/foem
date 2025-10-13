@@ -1,3 +1,5 @@
+-- How many people were treated by drug <ARG-DRUG><0> after the diagnosis of Condition <ARG-CONDITION><0>?
+
 WITH 
 -- Get source concept for condition
 condition_source AS (

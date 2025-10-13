@@ -1,3 +1,5 @@
+-- Number of patients grouped by race and ethnicity.
+
 SELECT
     rt.race,
     et.ethnicity,

@@ -19,13 +19,13 @@ if __name__ == "__main__":
              test_generator.patients_2drugs_or,
              test_generator.patients_4drugs_and_time,
              test_generator.patients_4drugs_and,
-             test_generator.patients_4drugs_or,
-             test_generator.patients_3drugs_and_time,
-             test_generator.patients_3drugs_and,
-             test_generator.patients_3drugs_or,
-             test_generator.patients_2conditions_and_time,
-             test_generator.patients_2conditions_and,
-             
+            #  test_generator.patients_4drugs_or,
+            #  test_generator.patients_3drugs_and_time,
+            #  test_generator.patients_3drugs_and,
+            #  test_generator.patients_3drugs_or,
+            #  test_generator.patients_2conditions_and_time,
+            #  test_generator.patients_2conditions_and,
+
              ] 
     
     results = []

@@ -1,3 +1,5 @@
+-- Number of patients grouped by gender and ethnicity.
+
 WITH gen_temp1 AS (
     SELECT
         concept_id,

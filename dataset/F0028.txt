@@ -1,1 +1,0 @@
-How many people have treated by drug <ARG-DRUG><0> after more than <ARG-TIMEDAYS><0> days of starting with drug <ARG-DRUG><1>?

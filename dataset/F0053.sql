@@ -1,3 +1,5 @@
+-- Number of patients with <ARG-CONDITION><O>.
+
 WITH 
 -- Get source concept for condition
 condition_source AS (

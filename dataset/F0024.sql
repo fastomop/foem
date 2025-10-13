@@ -1,3 +1,5 @@
+-- How many people have condition <ARG-CONDITION><0> at age <ARG-AGE><0>?
+
 WITH
             seed AS (
             SELECT c.concept_id AS src_id

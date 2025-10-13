@@ -1,3 +1,5 @@
+-- Counts of patients taking drug <ARG-DRUG><0> or <ARG-DRUG><1>.
+
 WITH 
 -- Get source concept for first drug
 drug1_source AS (

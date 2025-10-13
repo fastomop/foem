@@ -1,3 +1,5 @@
+-- How many people of ethnicity <ARG-ETHNICITY><0> have condition <ARG-CONDITION><0>?
+
 WITH 
 -- Get ethnicity concept
 ethnicity_concept AS (

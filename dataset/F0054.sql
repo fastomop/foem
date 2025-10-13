@@ -1,3 +1,5 @@
+-- Number of patients with residence state location at <ARG-STATE><0>.
+
 WITH 
 state_locations AS (
     SELECT location_id 

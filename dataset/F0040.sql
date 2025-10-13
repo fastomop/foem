@@ -1,3 +1,5 @@
+-- Number of patients grouped by gender.
+
 WITH gender_concepts AS (
     SELECT
         concept_id,

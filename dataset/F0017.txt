@@ -1,1 +1,0 @@
-Counts of patients with condition <ARG-CONDITION><0>, <ARG-CONDITION><1>, <ARG-CONDITION><2> or <ARG-CONDITION><3>.

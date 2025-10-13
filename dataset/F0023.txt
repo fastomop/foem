@@ -1,1 +1,0 @@
-How many people have Condition <ARG-CONDITION><0> more than <ARG-TIMEDAYS><0> days after diagnosed by Condition <ARG-CONDITION><1>?
