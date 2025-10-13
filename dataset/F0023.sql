@@ -55,5 +55,5 @@ JOIN condition1_concepts cc1 ON con1.condition_concept_id = cc1.concept_id
 JOIN condition_occurrence AS con2 ON con1.person_id = con2.person_id
 JOIN condition2_concepts cc2 ON con2.condition_concept_id = cc2.concept_id
 WHERE CAST(EXTRACT(epoch FROM
-    CAST(con1.condition_start_date AS TIMESTAMP) -
-    CAST(con2.condition_start_date AS TIMESTAMP)) / 86400 AS BIGINT) > %(days)s;
+    CAST(con2.condition_start_date AS TIMESTAMP) - 
+    CAST(con1.condition_start_date AS TIMESTAMP)) / 86400 AS BIGINT) >= %(days)s;

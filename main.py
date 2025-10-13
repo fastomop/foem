@@ -1,4 +1,4 @@
-from validator import SqlTest
+from sql_test import SqlTest
 import os
 import json
 
@@ -19,12 +19,32 @@ if __name__ == "__main__":
              test_generator.patients_2drugs_or,
              test_generator.patients_4drugs_and_time,
              test_generator.patients_4drugs_and,
-            #  test_generator.patients_4drugs_or,
-            #  test_generator.patients_3drugs_and_time,
-            #  test_generator.patients_3drugs_and,
-            #  test_generator.patients_3drugs_or,
-            #  test_generator.patients_2conditions_and_time,
-            #  test_generator.patients_2conditions_and,
+             test_generator.patients_4drugs_or,
+             test_generator.patients_3drugs_and_time,
+             test_generator.patients_3drugs_and,
+             test_generator.patients_3drugs_or,
+             test_generator.patients_2conditions_and_time,
+             test_generator.patients_2conditions_and,
+             test_generator.patients_2conditions_or,
+             test_generator.patients_4conditions_and_time,
+             test_generator.patients_4conditions_and,
+             test_generator.patients_4conditions_or,
+             test_generator.patients_3conditions_and_time,
+             test_generator.patients_3conditions_and,
+             test_generator.patients_3conditions_or,
+             test_generator.patients_distribution_by_birth,
+             test_generator.patients_condition_followed_condition,
+             test_generator.patients_condition_time_condition,
+             test_generator.patients_condition_age,
+             test_generator.patients_condition_race,
+             test_generator.patients_condition_state,
+             test_generator.patients_condition_year,
+             test_generator.patients_drug_time_drug,
+             test_generator.patients_drug_followed_drug,
+             test_generator.patients_condition_ethnicity,
+             test_generator.patients_drug_year,
+             
+
 
              ] 
     

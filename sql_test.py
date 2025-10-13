@@ -1,16 +1,76 @@
-from template import Template
 from config import get_db_connection
 from typing import Dict
 from contextlib import contextmanager
+from pathlib import Path
 import re
 
 class SqlTest:
 
     def __init__(self, conn=None):
         self.conn = conn or get_db_connection()
-        self.templates = Template()
+        self.dataset_dir = Path(__file__).parent / "dataset"
         self.vocab_dict = self.__build_vocab_dict()
         self._id = 1
+
+        # Mapping from template method names to SQL file numbers
+        self.template_map = {
+            "patients_group_by_gender_and_ethn": "F0001",
+            "patients_group_by_race": "F0002",
+            "patients_2drugs_and_time": "F0003",
+            "patients_2drugs_and": "F0004",
+            "patients_2drugs_or": "F0005",
+            "patients_4drugs_and_time": "F0006",
+            "patients_4drugs_and": "F0007",
+            "patients_4drugs_or": "F0008",
+            "patients_3drugs_and_time": "F0009",
+            "patients_3drugs_and": "F0010",
+            "patients_3drugs_or": "F0011",
+            "patients_2conditions_and_time": "F0012",
+            "patients_2conditions_and": "F0013",
+            "patients_2conditions_or": "F0014",
+            "patients_4conditions_and_time": "F0015",
+            "patients_4conditions_and": "F0016",
+            "patients_4conditions_or": "F0017",
+            "patients_3conditions_and_time": "F0018",
+            "patients_3conditions_and": "F0019",
+            "patients_3conditions_or": "F0020",
+            "patients_distribution_by_birth": "F0021",
+            "patients_condition_followed_condition": "F0022",
+            "patients_condition_time_condition": "F0023",
+            "patients_condition_age": "F0024",
+            "patients_condition_race": "F0025",
+            "patients_condition_state": "F0026",
+            "patients_condition_year": "F0027",
+            "patients_drug_time_drug": "F0028",
+            "patients_drug_followed_drug": "F0029",
+            "patients_condition_ethnicity": "F0030",
+            "patients_drug_year": "F0031",
+            "patients_drug_after_condition": "F0032",
+            "patients_drug_time_after_condition": "F0033",
+            "patients_gender_condition": "F0034",
+            "patients_year": "F0035",
+            "patients_gender_state": "F0036",
+            "patients_group_by_ethnicity_location": "F0037",
+            "patients_group_by_ethnicity_birth": "F0038",
+            "patients_group_by_ethnicity": "F0039",
+            "patients_group_by_gender": "F0040",
+            "patients_group_by_race_ethnicity": "F0041",
+            "patients_grouped_by_race_gender": "F0042",
+            "patients_group_by_race_location": "F0043",
+            "patients_group_by_race_birth": "F0044",
+            "patients_group_by_location": "F0045",
+            "patients_group_by_birth_gender": "F0046",
+            "patients_group_by_birth_location": "F0047",
+            "patients_count": "F0048",
+            "patients_count_by_ethnicity": "F0049",
+            "patients_count_by_race": "F0050",
+            "patients_count_by_gender": "F0051",
+            "patients_drug": "F0052",
+            "patients_condition": "F0053",
+            "patients_count_by_location": "F0054",
+            "patients_condition_group_by_year": "F0055",
+            "patients_drug_group_by_year": "F0056",
+        }
     
     def close(self) -> None:
         """Close the database connection."""
@@ -19,6 +79,53 @@ class SqlTest:
                 self.conn.close()
         finally:
             self.conn = None
+
+    def _read_template(self, method_name: str):
+        """Read SQL template from dataset folder based on method name."""
+        file_id = self.template_map.get(method_name)
+        if not file_id:
+            raise ValueError(f"No template file found for method: {method_name}")
+
+        file_path = self.dataset_dir / f"{file_id}.sql"
+        if not file_path.exists():
+            raise FileNotFoundError(f"Template file not found: {file_path}")
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Extract the description (first comment line) and SQL
+        lines = content.split('\n')
+        description = ""
+        sql_lines = []
+
+        for line in lines:
+            if line.strip().startswith('--'):
+                if not description:
+                    description = line.strip()[2:].strip()
+            else:
+                sql_lines.append(line)
+
+        sql = '\n'.join(sql_lines).strip()
+        return sql, description
+
+    def _get_template_sql(self, method_name: str, params: dict = None):
+        """Get SQL template and return it with parameters."""
+        sql, description = self._read_template(method_name)
+        return sql, params or {}
+
+    def find_code_by_name(self, name: str, vocab_dict: dict):
+        """
+        Given a drug/concept name (case-insensitive) and a dictionary in the form:
+            {"RxNorm": {"concept_code": "concept_name", ...}, ...}
+
+        Return list of [(vocabulary_id, concept_code)] for ALL matches found.
+        """
+        results = []
+        for vocab_id, codes in vocab_dict.items():
+            for concept_code, concept_name in codes.items():
+                if concept_name.lower() == name.lower():
+                    results.append((vocab_id, concept_code))
+        return results
 
     @contextmanager
     def _cursor(self):
@@ -40,18 +147,89 @@ class SqlTest:
                 cur.execute(query)
             return cur.fetchall()
 
-    def _process_results(self, results, text_template, template_func, *args):
+    def _process_results(self, results, text_template, template_method_name, *args):
         """
-        Helper to process results, format text, call template, and return output data.
+        Helper to process results, format text, read template from file, and return output data.
         Each result is returned as a dict with fields: id, text, sql, result.
         """
         import re
+        from decimal import Decimal
         output = []
         for row in results:
             text = text_template.format(*row)
-            ids = [self.templates.find_code_by_name(val, self.vocab_dict) for val in row if isinstance(val, str)]
+            # Get vocab and code IDs for each string value in the row
+            ids = [self.find_code_by_name(val, self.vocab_dict) for val in row if isinstance(val, str)]
+            # ids is a list of lists of tuples: [[("RxNorm", "123")], [("ATC", "456")]]
+            # Flatten to list of tuples: [("RxNorm", "123"), ("ATC", "456")]
             ids_flat = [item for sublist in ids for item in sublist]
-            query, params = template_func(*ids_flat, *args)
+
+            # Build parameters dict based on the template method
+            params = {}
+            if 'drugs' in template_method_name or 'drug' in template_method_name:
+                # For drug queries, map v_id and d_id parameters
+                # ids_flat is a list of tuples like [("RxNorm", "123"), ("ATC", "456")]
+                for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
+                    params[f'v_id{idx}'] = vocab_id
+                    params[f'd_id{idx}'] = code_id
+            elif 'condition' in template_method_name:
+                # For condition queries, similar mapping
+                for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
+                    params[f'v_id{idx}'] = vocab_id
+                    params[f'c_id{idx}'] = code_id
+
+            # Add additional args (like days, age, etc.)
+            # For methods where numeric values come from query results (like age, year), extract from row
+            if 'age' in template_method_name:
+                # For age queries, the age is typically the last non-string value in the row
+                age_values = [val for val in row if isinstance(val, (int, float, Decimal))]
+                if age_values:
+                    params['age'] = int(age_values[-1])
+                elif args:
+                    params['age'] = args[0]
+            elif 'year' in template_method_name:
+                # For year queries, the year is typically the last non-string value in the row
+                year_values = [val for val in row if isinstance(val, (int, float, Decimal))]
+                if year_values:
+                    params['year'] = int(year_values[-1])
+                elif args:
+                    params['year'] = args[0]
+            elif args:
+                if 'time' in template_method_name or 'days' in template_method_name:
+                    params['days'] = args[0]
+            
+            # Handle string parameters like race, ethnicity, gender, state
+            # These are string values from the query results that need to be passed to the template
+            string_values = [val for val in row if isinstance(val, str) and val not in [item for sublist in ids for item in sublist]]
+            
+            if 'race' in template_method_name:
+                # For race queries, find the race name (string not in vocab_dict)
+                for val in row:
+                    if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
+                        params['race'] = val
+                        break
+            
+            if 'ethnicity' in template_method_name:
+                # For ethnicity queries, find the ethnicity name
+                for val in row:
+                    if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
+                        params['ethnicity'] = val
+                        break
+            
+            if 'gender' in template_method_name:
+                # For gender queries, find the gender value
+                for val in row:
+                    if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
+                        params['gender'] = val
+                        break
+            
+            if 'state' in template_method_name or 'location' in template_method_name:
+                # For state/location queries, find the state name
+                for val in row:
+                    if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
+                        params['state'] = val
+                        break
+
+            query, _ = self._read_template(template_method_name)
             sql_raw = self.__finalise_sql(query, params, self.conn)
             sql = re.sub(r'\s+', ' ', sql_raw).strip()
 
@@ -146,7 +324,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0} and {1} within 30 days.",
-            self.templates.patients_2drugs_and_time,
+            "patients_2drugs_and_time",
             30
         )
     
@@ -188,7 +366,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0} and {1}.",
-            self.templates.patients_2drugs_and
+            "patients_2drugs_and"
         )
 
     def patients_2drugs_or(self):
@@ -257,7 +435,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0} or {1}.",
-            self.templates.patients_2drugs_or
+            "patients_2drugs_or"
         )
 
     def patients_4drugs_and_time(self):
@@ -329,7 +507,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0}, {1}, {2} and {3} within 30 days.",
-            self.templates.patients_4drugs_and_time,
+            "patients_4drugs_and_time",
             30
         )
 
@@ -384,7 +562,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0}, {1}, {2} and {3}.",
-            self.templates.patients_4drugs_and
+            "patients_4drugs_and"
         )
 
     def patients_4drugs_or(self):
@@ -473,7 +651,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0}, {1}, {2} or {3}.",
-            self.templates.patients_4drugs_or
+            "patients_4drugs_or"
         )
 
     def patients_3drugs_and_time(self):
@@ -528,7 +706,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0}, {1} and {2} within 30 days.",
-            self.templates.patients_3drugs_and_time,
+            "patients_3drugs_and_time",
             30
         )
 
@@ -577,7 +755,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0}, {1} and {2}.",
-            self.templates.patients_3drugs_and
+            "patients_3drugs_and"
         )
 
     def patients_3drugs_or(self):
@@ -645,7 +823,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients taking drug {0}, {1} or {2}.",
-            self.templates.patients_3drugs_or
+            "patients_3drugs_or"
         )
 
     def patients_2conditions_and_time(self):
@@ -710,7 +888,7 @@ class SqlTest:
         return self._process_results(
             result,
             "Counts of patients with condition {0} and {1} within 30 days.",
-            self.templates.patients_2conditions_and_time,
+            "patients_2conditions_and_time",
             30
         )
 
@@ -767,7 +945,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0} and {1}.",
-            self.templates.patients_2conditions_and
+            "patients_2conditions_and"
         )
     
     def patients_2conditions_or(self):
@@ -836,7 +1014,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0} or {1}.",
-            self.templates.patients_2conditions_or
+            "patients_2conditions_or"
         )
 
     def patients_4conditions_and_time(self):
@@ -898,7 +1076,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0}, {1}, {2} and {3} within 1000 days.",
-            self.templates.patients_4conditions_and_time,
+            "patients_4conditions_and_time",
             1000
         )
 
@@ -958,7 +1136,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0}, {1}, {2} and {3}.",
-            self.templates.patients_4conditions_and
+            "patients_4conditions_and"
         )
 
     def patients_4conditions_or(self):
@@ -1052,10 +1230,10 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0}, {1}, {2} or {3}.",
-            self.templates.patients_4conditions_or
+            "patients_4conditions_or"
         )
 
-    def patients_3conditions_and_time(self): #check the chronic pain problem, cause it is a observation and not condition
+    def patients_3conditions_and_time(self):
 
         query = """
         WITH valid_conditions AS (
@@ -1107,7 +1285,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0}, {1} and {2} within 300 days.",
-            self.templates.patients_3conditions_and_time,
+            "patients_3conditions_and_time",
             300
         )
 
@@ -1163,7 +1341,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0}, {1} and {2}.",
-            self.templates.patients_3conditions_and
+            "patients_3conditions_and"
         )
     
     def patients_3conditions_or(self):
@@ -1246,7 +1424,7 @@ class SqlTest:
         return self._process_results(
             results,
             "Counts of patients with condition {0}, {1} or {2}.",
-            self.templates.patients_3conditions_or
+            "patients_3conditions_or"
         )
 
     def patients_distribution_by_birth(self):
@@ -1254,20 +1432,22 @@ class SqlTest:
         Distribution of patients by year of birth.
         """
         text = "Distribution of patients by year of birth."
-        query, params = self.templates.patients_distribution_by_birth()
+        query, params = self._get_template_sql("patients_distribution_by_birth")
         sql_raw = self.__finalise_sql(query, params, self.conn)
         sql = re.sub(r'\s+', ' ', sql_raw).strip()
 
         with self._cursor() as cur:
             cur.execute(query, params)
             query_result = cur.fetchall()
-        
-        return [{
+
+        result = {
             "id": self._id,
             "text": text,
             "sql": sql,
             "result": query_result
-        }]
+        }
+        self._id += 1
+        return [result]
 
     def patients_condition_followed_condition(self):
 
@@ -1321,7 +1501,7 @@ class SqlTest:
         return self._process_results(
             results,
             "How many people have Condition {0} followed by Condition {1}?",
-            self.templates.patients_condition_followed_condition
+            "patients_condition_followed_condition"
         )
 
     def patients_condition_time_condition(self):
@@ -1368,7 +1548,7 @@ class SqlTest:
         return self._process_results(
             results,
             "How many people have Condition {1} more than 30 days after diagnosed by Condition {0}?",
-            self.templates.patients_condition_time_condition,
+            "patients_condition_time_condition",
             30
         )
 
@@ -1421,23 +1601,12 @@ class SqlTest:
         ORDER BY total_condition_count DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for c1, age in result:
-            text = f"""
-            How many people have condition {c1} at age {age}?
-            """
-            v_id1, c_id1 = self.templates.find_code_by_name(c1, self.vocab_dict)
-            query, params = self.templates.patients_condition_age(v_id1, c_id1, age)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have condition {0} at age {1}?",
+            "patients_condition_age"
+        )
 
     def patients_condition_race(self):
 
@@ -1495,50 +1664,129 @@ class SqlTest:
         ORDER BY total_patients DESC, condition_name
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for c1, race in result:
-            text = f"""
-            How many people have condition {c1} in the cohort of race {race}?
-            """
-            v_id1, c_id1 = self.templates.find_code_by_name(c1, self.vocab_dict)
-            query, params = self.templates.patients_condition_race(v_id1, c_id1, race)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have condition {0} in the cohort of race {1}?",
+            "patients_condition_race"
+        )
 
     def patients_condition_state(self):
 
         query = """
-        
+        WITH valid_conditions AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Condition'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        cond_persons AS (
+        SELECT DISTINCT
+            co.person_id,
+            co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        ),
+        state_labeled AS (
+        SELECT
+            cp.condition_concept_id,
+            cp.person_id,
+            COALESCE(l.state, 'Unknown') AS state_name
+        FROM cond_persons cp
+        JOIN person p
+            ON p.person_id = cp.person_id
+        LEFT JOIN location l
+            ON l.location_id = p.location_id
+        ),
+        counts AS (
+        SELECT
+            condition_concept_id,
+            state_name,
+            COUNT(DISTINCT person_id) AS n
+        FROM state_labeled
+        GROUP BY condition_concept_id, state_name
+        ),
+        ranked AS (
+        SELECT
+            c1.concept_name AS condition_name,
+            state_name,
+            n,
+            RANK() OVER (PARTITION BY condition_concept_id ORDER BY n DESC, state_name) AS rnk,
+            SUM(n) OVER (PARTITION BY condition_concept_id) AS total_patients
+        FROM counts
+        JOIN concept c1 ON c1.concept_id = condition_concept_id
+        )
+        SELECT
+        condition_name,
+        state_name AS most_common_state
+        -- n         AS state_patient_count,
+        -- total_patients
+        FROM ranked
+        WHERE rnk = 1
+        ORDER BY total_patients DESC, condition_name
+        LIMIT 20;
         """
-        
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for c1, state in result:
-            text = f"""
-            How many people have condition {c1} in the state {state}?
-            """
-            v_id1, c_id1 = self.templates.find_code_by_name(c1, self.vocab_dict)
-            query, params = self.templates.patients_condition_state(v_id1, c_id1, state)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have condition {0} in the state {1}?",
+            "patients_condition_state"
+        )
 
     def patients_condition_year(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Condition'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        condition_years AS (
+        SELECT
+            co.condition_concept_id,
+            co.person_id,
+            EXTRACT(YEAR FROM co.condition_start_date)::int AS year
+        FROM condition_occurrence co
+        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_start_date IS NOT NULL
+        ),
+        counts AS (
+        SELECT
+            condition_concept_id,
+            year,
+            COUNT(DISTINCT person_id) AS n
+        FROM condition_years
+        GROUP BY condition_concept_id, year
+        ),
+        ranked AS (
+        SELECT
+            c1.concept_name AS condition_name,
+            year,
+            n,
+            RANK() OVER (PARTITION BY condition_concept_id ORDER BY n DESC, year) AS rnk,
+            SUM(n) OVER (PARTITION BY condition_concept_id) AS total_patients
+        FROM counts
+        JOIN concept c1 ON c1.concept_id = condition_concept_id
+        )
+        SELECT
+        condition_name,
+        year AS most_common_year
+        -- n         AS year_patient_count,
+        -- total_patients
+        FROM ranked
+        WHERE rnk = 1
+        ORDER BY total_patients DESC, condition_name
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people were diagnosed with condition {0} in year {1}?",
+            "patients_condition_year"
+        )
 
     def patients_drug_time_drug(self):
 
@@ -1585,7 +1833,7 @@ class SqlTest:
         return self._process_results(
             results,
             "How many people have treated by drug {1} after more than 30 days of starting with drug {0}?",
-            self.templates.patients_drug_time_drug,
+            "patients_drug_time_drug",
             30
         )
 
@@ -1639,28 +1887,75 @@ class SqlTest:
         ORDER BY COUNT(DISTINCT p.person_id) DESC
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, d2 in result:
-            text = f"""
-            How many people have treated by drug {d1} followed by drug {d2}?
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            v_id2, d_id2 = self.templates.find_code_by_name(d2, self.vocab_dict)
-            query, params = self.templates.patients_drug_followed_drug(v_id1, v_id2, d_id1, d_id2)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have treated by drug {0} followed by drug {1}?",
+            "patients_drug_followed_drug"
+        )
 
     def patients_condition_ethnicity(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Condition'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        cond_persons AS (
+        SELECT DISTINCT
+            co.person_id,
+            co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        ),
+        ethnicity_labeled AS (
+        SELECT
+            cp.condition_concept_id,
+            cp.person_id,
+            COALESCE(ec.concept_name, 'Unknown') AS ethnicity_name
+        FROM cond_persons cp
+        JOIN person p
+            ON p.person_id = cp.person_id
+        LEFT JOIN concept ec
+            ON ec.concept_id = p.ethnicity_concept_id
+        ),
+        counts AS (
+        SELECT
+            condition_concept_id,
+            ethnicity_name,
+            COUNT(DISTINCT person_id) AS n
+        FROM ethnicity_labeled
+        GROUP BY condition_concept_id, ethnicity_name
+        ),
+        ranked AS (
+        SELECT
+            c1.concept_name AS condition_name,
+            ethnicity_name,
+            n,
+            RANK() OVER (PARTITION BY condition_concept_id ORDER BY n DESC, ethnicity_name) AS rnk,
+            SUM(n) OVER (PARTITION BY condition_concept_id) AS total_patients
+        FROM counts
+        JOIN concept c1 ON c1.concept_id = condition_concept_id
+        )
+        SELECT
+        condition_name,
+        ethnicity_name AS most_common_ethnicity
+        -- n         AS ethnicity_patient_count,
+        -- total_patients
+        FROM ranked
+        WHERE rnk = 1
+        ORDER BY total_patients DESC, condition_name
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people have condition {0} in the cohort of ethnicity {1}?",
+            "patients_condition_ethnicity"
+        )
 
     def patients_drug_year(self):
 
@@ -1709,23 +2004,12 @@ class SqlTest:
         ORDER BY r.year, r.patient_count DESC, drug_name
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for d1, year in result:
-            text = f"""
-            How many people were taking drug {d1} in year {year}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            query, params = self.templates.patients_drug_year(v_id1, d_id1, year)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people were taking drug {0} in year {1}.",
+            "patients_drug_year"
+        )
 
     def patients_drug_after_condition(self):
 
@@ -1750,22 +2034,12 @@ class SqlTest:
         ORDER BY COUNT(*) DESC, year
         LIMIT 20;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for (year,) in result:
-            text = f"""
-            Number of patients born in year {year}.
-            """
-            query, params = self.templates.patients_year(year)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients born in year {0}.",
+            "patients_year"
+        )
 
     def patients_gender_state(self):
         
@@ -1773,14 +2047,14 @@ class SqlTest:
             
             """
         
-        query, params = self.templates.patients_gender_state()
+        query, params = self._get_template_sql("patients_gender_state")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
         results = self._run_query(query)
         return self._process_results(
             results,
             "Number of patients by gender and state.",
-            self.templates.patients_gender_state()
+            "patients_gender_state"
         )
 
     def patients_group_by_ethnicity_location(self):
@@ -1789,7 +2063,7 @@ class SqlTest:
             Number of patients grouped by ethnicity and residence state location.
             """
         
-        query, params = self.templates.patients_group_by_ethnicity_location()
+        query, params = self._get_template_sql("patients_group_by_ethnicity_location")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
 
@@ -1799,7 +2073,7 @@ class SqlTest:
             Number of patients grouped by ethnicity and year of birth.
             """
         
-        query, params = self.templates.patients_group_by_ethnicity_birth()
+        query, params = self._get_template_sql("patients_group_by_ethnicity_birth")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
 
@@ -1809,7 +2083,7 @@ class SqlTest:
             Number of patients grouped by ethnicity.
             """
         
-        query, params = self.templates.patients_group_by_ethnicity()
+        query, params = self._get_template_sql("patients_group_by_ethnicity")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")    
 
@@ -1819,7 +2093,7 @@ class SqlTest:
             Number of patients grouped by gender.
             """
         
-        query, params = self.templates.patients_group_by_gender()
+        query, params = self._get_template_sql("patients_group_by_gender")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")   
 
@@ -1829,7 +2103,7 @@ class SqlTest:
             Number of patients grouped by race and ethnicity.
             """
         
-        query, params = self.templates.patients_group_by_race_ethnicity()
+        query, params = self._get_template_sql("patients_group_by_race_ethnicity")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")     
 
@@ -1839,7 +2113,7 @@ class SqlTest:
             Number of patients grouped by race and gender.
             """
         
-        query, params = self.templates.patients_grouped_by_race_gender()
+        query, params = self._get_template_sql("patients_grouped_by_race_gender")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
 
@@ -1849,7 +2123,7 @@ class SqlTest:
             Number of patients grouped by race and residence state location.
             """
         
-        query, params = self.templates.patients_group_by_race_location()
+        query, params = self._get_template_sql("patients_group_by_race_location")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n") 
     
@@ -1859,7 +2133,7 @@ class SqlTest:
             Number of patients grouped by race and year of birth.
             """
         
-        query, params = self.templates.patients_group_by_race_birth()
+        query, params = self._get_template_sql("patients_group_by_race_birth")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
 
@@ -1869,7 +2143,7 @@ class SqlTest:
             Number of patients grouped by residence state location.
         """
 
-        query, params = self.templates.patients_group_by_location()
+        query, params = self._get_template_sql("patients_group_by_location")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
 
@@ -1879,7 +2153,7 @@ class SqlTest:
             Number of patients grouped by year of birth and gender.
         """
 
-        query, params = self.templates.patients_group_by_birth_gender()
+        query, params = self._get_template_sql("patients_group_by_birth_gender")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
     
@@ -1889,7 +2163,7 @@ class SqlTest:
             Number of patients grouped by year of birth and residence state location.
         """
 
-        query, params = self.templates.patients_group_by_birth_location()
+        query, params = self._get_template_sql("patients_group_by_birth_location")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
 
@@ -1899,7 +2173,7 @@ class SqlTest:
             Number of patients in the dataset.
         """
 
-        query, params = self.templates.patients_count()
+        query, params = self._get_template_sql("patients_count")
         query = self.__finalise_sql(query, params, self.conn)
         print(text, "\n", query, "\n\n\n\n\n\n")
     
@@ -1915,23 +2189,12 @@ class SqlTest:
         GROUP BY c.concept_name
         ORDER BY COUNT(*) DESC;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for (ethn,) in result:
-            text = f"""
-            Number of patients of ethnicity {ethn}.
-            """
-
-            query, params = self.templates.patients_count_by_ethnicity(ethn)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients of ethnicity {0}.",
+            "patients_count_by_ethnicity"
+        )
 
     def patients_count_by_race(self):
 
@@ -1946,23 +2209,12 @@ class SqlTest:
         GROUP BY c.concept_name
         ORDER BY COUNT(*) DESC;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for (race,) in result:
-            text = f"""
-            Number of patients of race {race}.
-            """
-
-            query, params = self.templates.patients_count_by_race(race)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients of race {0}.",
+            "patients_count_by_race"
+        )
 
     def patients_count_by_gender(self):
 
@@ -1979,23 +2231,12 @@ class SqlTest:
         GROUP BY COALESCE(c.concept_name, 'Unknown')
         ORDER BY COUNT(*) DESC;
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for (gender,) in result:
-            text = f"""
-            Number of patients of specific gender {gender}.
-            """
-
-            query, params = self.templates.patients_count_by_gender(gender)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients of specific gender {0}.",
+            "patients_count_by_gender"
+        )
     
     def patients_drug(self):
 
@@ -2019,22 +2260,12 @@ class SqlTest:
         ORDER BY COUNT(DISTINCT de.person_id) DESC
         LIMIT 20;
         """
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for (d1,) in result:
-            text = f"""
-            Number of patients taking {d1}.
-            """
-            v_id1, d_id1 = self.templates.find_code_by_name(d1, self.vocab_dict)
-            query, params = self.templates.patients_drug(v_id1, d_id1)
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients taking {0}.",
+            "patients_drug"
+        )
 
     def patients_condition(self):
 
@@ -2058,7 +2289,7 @@ class SqlTest:
             Number of patients with residence state location at {location}.
             """
 
-            query, params = self.templates.patients_count_by_location(location)
+            query, params = self._get_template_sql("patients_count_by_location", {"location": location})
             query = self.__finalise_sql(query, params, self.conn)
             print(text, "\n", query, "\n\n\n\n\n\n")
 
