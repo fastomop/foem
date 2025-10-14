@@ -165,7 +165,18 @@ class SqlTest:
 
             # Build parameters dict based on the template method
             params = {}
-            if 'drugs' in template_method_name or 'drug' in template_method_name:
+            # Special handling for mixed condition+drug queries
+            if 'drug_after_condition' in template_method_name or 'drug_time_after_condition' in template_method_name:
+                # For these queries: first value is condition, second is drug
+                # Template expects: v_id1, c_id1 for condition; v_id2, d_id1 for drug
+                if len(ids_flat) >= 2:
+                    # First concept is condition
+                    params['v_id1'] = ids_flat[0][0]
+                    params['c_id1'] = ids_flat[0][1]
+                    # Second concept is drug
+                    params['v_id2'] = ids_flat[1][0]
+                    params['d_id1'] = ids_flat[1][1]
+            elif 'drugs' in template_method_name or 'drug' in template_method_name:
                 # For drug queries, map v_id and d_id parameters
                 # ids_flat is a list of tuples like [("RxNorm", "123"), ("ATC", "456")]
                 for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
@@ -223,10 +234,11 @@ class SqlTest:
                         break
             
             if 'state' in template_method_name or 'location' in template_method_name:
-                # For state/location queries, find the state name
+                # For state/location queries, find the state/location name
                 for val in row:
                     if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
                         params['state'] = val
+                        params['location'] = val  # Some templates use 'location' instead of 'state'
                         break
 
             query, _ = self._read_template(template_method_name)
@@ -2013,15 +2025,193 @@ class SqlTest:
 
     def patients_drug_after_condition(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Condition'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        valid_drugs AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Drug'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        cond_occ AS (
+        SELECT
+            co.person_id,
+            co.condition_concept_id,
+            co.condition_start_date::date AS cond_date
+        FROM condition_occurrence co
+        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        ),
+        drug_exp AS (
+        SELECT
+            de.person_id,
+            de.drug_concept_id,
+            de.drug_exposure_start_date::date AS drug_date
+        FROM drug_exposure de
+        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        ),
+        pairs AS (
+        -- one row per (person, condition, drug) where drug starts after condition
+        SELECT DISTINCT
+            co.person_id,
+            co.condition_concept_id,
+            de.drug_concept_id
+        FROM cond_occ co
+        JOIN drug_exp de
+            ON de.person_id = co.person_id
+        AND de.drug_date > co.cond_date
+        )
+        SELECT
+        c1.concept_name AS condition_name,
+        c2.concept_name AS drug_name
+        -- ,COUNT(DISTINCT p.person_id) AS patient_count
+        FROM pairs p
+        JOIN concept c1 ON c1.concept_id = p.condition_concept_id
+        JOIN concept c2 ON c2.concept_id = p.drug_concept_id
+        GROUP BY c1.concept_name, c2.concept_name
+        ORDER BY COUNT(DISTINCT p.person_id) DESC
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people took drug {1} after being diagnosed with condition {0}?",
+            "patients_drug_after_condition"
+        )
 
     def patients_drug_time_after_condition(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Condition'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        valid_drugs AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Drug'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        cond_occ AS (
+        SELECT
+            co.person_id,
+            co.condition_concept_id,
+            co.condition_start_date::date AS cond_date
+        FROM condition_occurrence co
+        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        ),
+        drug_exp AS (
+        SELECT
+            de.person_id,
+            de.drug_concept_id,
+            de.drug_exposure_start_date::date AS drug_date
+        FROM drug_exposure de
+        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        ),
+        pairs AS (
+        -- one row per (person, condition, drug) where drug starts more than 30 days after condition
+        SELECT DISTINCT
+            co.person_id,
+            co.condition_concept_id,
+            de.drug_concept_id
+        FROM cond_occ co
+        JOIN drug_exp de
+            ON de.person_id = co.person_id
+        AND (de.drug_date - co.cond_date) > 30
+        )
+        SELECT
+        c1.concept_name AS condition_name,
+        c2.concept_name AS drug_name
+        -- ,COUNT(DISTINCT p.person_id) AS patient_count
+        FROM pairs p
+        JOIN concept c1 ON c1.concept_id = p.condition_concept_id
+        JOIN concept c2 ON c2.concept_id = p.drug_concept_id
+        GROUP BY c1.concept_name, c2.concept_name
+        ORDER BY COUNT(DISTINCT p.person_id) DESC
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "How many people were treated by drug {1} more than 30 days after being diagnosed with condition {0}?",
+            "patients_drug_time_after_condition",
+            30
+        )
 
     def patients_gender_condition(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT c.concept_id
+        FROM concept c
+        WHERE c.domain_id = 'Condition'
+            AND c.standard_concept = 'S'
+            AND c.invalid_reason IS NULL
+        ),
+        cond_persons AS (
+        SELECT DISTINCT
+            co.person_id,
+            co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        ),
+        gender_labeled AS (
+        SELECT
+            cp.condition_concept_id,
+            cp.person_id,
+            COALESCE(gc.concept_name, 'Unknown') AS gender_name
+        FROM cond_persons cp
+        JOIN person p
+            ON p.person_id = cp.person_id
+        LEFT JOIN concept gc
+            ON gc.concept_id = p.gender_concept_id
+        AND gc.domain_id = 'Gender'
+        AND gc.standard_concept = 'S'
+        ),
+        counts AS (
+        SELECT
+            condition_concept_id,
+            gender_name,
+            COUNT(DISTINCT person_id) AS n
+        FROM gender_labeled
+        GROUP BY condition_concept_id, gender_name
+        ),
+        ranked AS (
+        SELECT
+            c1.concept_name AS condition_name,
+            gender_name,
+            n,
+            RANK() OVER (PARTITION BY condition_concept_id ORDER BY n DESC, gender_name) AS rnk,
+            SUM(n) OVER (PARTITION BY condition_concept_id) AS total_patients
+        FROM counts
+        JOIN concept c1 ON c1.concept_id = condition_concept_id
+        )
+        SELECT
+        gender_name AS most_common_gender,
+        condition_name
+        -- n         AS gender_patient_count,
+        -- total_patients
+        FROM ranked
+        WHERE rnk = 1
+        ORDER BY total_patients DESC, condition_name
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of {0} patients with {1}.",
+            "patients_gender_condition"
+        )
     
     def patients_year(self):
 
@@ -2042,140 +2232,290 @@ class SqlTest:
         )
 
     def patients_gender_state(self):
-        
-        text = """
-            
-            """
-        
+        """
+        Number of patients by gender and state.
+        """
+        text = "Number of patients by gender and state."
         query, params = self._get_template_sql("patients_gender_state")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
-        results = self._run_query(query)
-        return self._process_results(
-            results,
-            "Number of patients by gender and state.",
-            "patients_gender_state"
-        )
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_ethnicity_location(self):
-
-        text = """
-            Number of patients grouped by ethnicity and residence state location.
-            """
-        
+        """
+        Number of patients grouped by ethnicity and residence state location.
+        """
+        text = "Number of patients grouped by ethnicity and residence state location."
         query, params = self._get_template_sql("patients_group_by_ethnicity_location")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_ethnicity_birth(self):
-
-        text = """
-            Number of patients grouped by ethnicity and year of birth.
-            """
-        
+        """
+        Number of patients grouped by ethnicity and year of birth.
+        """
+        text = "Number of patients grouped by ethnicity and year of birth."
         query, params = self._get_template_sql("patients_group_by_ethnicity_birth")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_ethnicity(self):
-
-        text = """
-            Number of patients grouped by ethnicity.
-            """
-        
+        """
+        Number of patients grouped by ethnicity.
+        """
+        text = "Number of patients grouped by ethnicity."
         query, params = self._get_template_sql("patients_group_by_ethnicity")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")    
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_gender(self):
-
-        text = """
-            Number of patients grouped by gender.
-            """
-        
+        """
+        Number of patients grouped by gender.
+        """
+        text = "Number of patients grouped by gender."
         query, params = self._get_template_sql("patients_group_by_gender")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")   
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]   
 
     def patients_group_by_race_ethnicity(self):
-
-        text = """
-            Number of patients grouped by race and ethnicity.
-            """
-        
+        """
+        Number of patients grouped by race and ethnicity.
+        """
+        text = "Number of patients grouped by race and ethnicity."
         query, params = self._get_template_sql("patients_group_by_race_ethnicity")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")     
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_grouped_by_race_gender(self):
-
-        text = """
-            Number of patients grouped by race and gender.
-            """
-        
+        """
+        Number of patients grouped by race and gender.
+        """
+        text = "Number of patients grouped by race and gender."
         query, params = self._get_template_sql("patients_grouped_by_race_gender")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_race_location(self):
-
-        text = """
-            Number of patients grouped by race and residence state location.
-            """
-        
+        """
+        Number of patients grouped by race and residence state location.
+        """
+        text = "Number of patients grouped by race and residence state location."
         query, params = self._get_template_sql("patients_group_by_race_location")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n") 
-    
-    def patients_group_by_race_birth(self):
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
 
-        text = """
-            Number of patients grouped by race and year of birth.
-            """
-        
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
+
+    def patients_group_by_race_birth(self):
+        """
+        Number of patients grouped by race and year of birth.
+        """
+        text = "Number of patients grouped by race and year of birth."
         query, params = self._get_template_sql("patients_group_by_race_birth")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_location(self):
-
-        text = """
-            Number of patients grouped by residence state location.
         """
-
+        Number of patients grouped by residence state location.
+        """
+        text = "Number of patients grouped by residence state location."
         query, params = self._get_template_sql("patients_group_by_location")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_birth_gender(self):
-
-        text =  """
-            Number of patients grouped by year of birth and gender.
         """
-
+        Number of patients grouped by year of birth and gender.
+        """
+        text = "Number of patients grouped by year of birth and gender."
         query, params = self._get_template_sql("patients_group_by_birth_gender")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
-    
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
+
     def patients_group_by_birth_location(self):
-
-        text = """
-            Number of patients grouped by year of birth and residence state location.
         """
-
+        Number of patients grouped by year of birth and residence state location.
+        """
+        text = "Number of patients grouped by year of birth and residence state location."
         query, params = self._get_template_sql("patients_group_by_birth_location")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_count(self):
-
-        text = """
-            Number of patients in the dataset.
         """
-
+        Number of patients in the dataset.
+        """
+        text = "Number of patients in the dataset."
         query, params = self._get_template_sql("patients_count")
-        query = self.__finalise_sql(query, params, self.conn)
-        print(text, "\n", query, "\n\n\n\n\n\n")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
     
     def patients_count_by_ethnicity(self):
 
@@ -2269,42 +2609,196 @@ class SqlTest:
 
     def patients_condition(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT concept_id
+        FROM concept
+        WHERE domain_id = 'Condition'
+            AND standard_concept = 'S'
+            AND invalid_reason IS NULL
+        )
+        SELECT
+        c.concept_name AS condition_name
+        -- ,COUNT(DISTINCT co.person_id) AS patient_count
+        FROM condition_occurrence co
+        JOIN valid_conditions vc
+        ON vc.concept_id = co.condition_concept_id
+        JOIN concept c
+        ON c.concept_id = co.condition_concept_id
+        GROUP BY c.concept_name
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients with {0}.",
+            "patients_condition"
+        )
 
     def patients_count_by_location(self):
-
-        query = """
         """
-
-        result = None
-        with self._cursor() as cur:
-
-            cur.execute(query)
-            result = cur.fetchall()
-
-        print(result)
-
-        for (location,) in result:
-            text = f"""
-            Number of patients with residence state location at {location}.
-            """
-
-            query, params = self._get_template_sql("patients_count_by_location", {"location": location})
-            query = self.__finalise_sql(query, params, self.conn)
-            print(text, "\n", query, "\n\n\n\n\n\n")
+        Number of patients grouped by residence state location.
+        """
+        query = """
+        SELECT
+        l.state AS location
+        -- ,COUNT(DISTINCT p.person_id) AS patient_count
+        FROM person p
+        JOIN location l ON p.location_id = l.location_id
+        WHERE l.state IS NOT NULL
+        GROUP BY l.state
+        ORDER BY COUNT(DISTINCT p.person_id) DESC
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Number of patients with residence state location at {0}.",
+            "patients_count_by_location"
+        )
 
     def patients_condition_group_by_year(self):
 
-        pass
+        query = """
+        WITH valid_conditions AS (
+        SELECT concept_id
+        FROM concept
+        WHERE domain_id = 'Condition'
+            AND standard_concept = 'S'
+            AND invalid_reason IS NULL
+        ),
+        yearly_counts AS (
+        SELECT
+            EXTRACT(YEAR FROM condition_start_date)::int AS year,
+            condition_concept_id,
+            COUNT(DISTINCT person_id) AS patient_count
+        FROM condition_occurrence
+        JOIN valid_conditions vc ON vc.concept_id = condition_concept_id
+        GROUP BY 1, 2
+        ),
+        ranked AS (
+        SELECT
+            yc.year,
+            yc.condition_concept_id,
+            yc.patient_count,
+            ROW_NUMBER() OVER (
+            PARTITION BY yc.year
+            ORDER BY yc.patient_count DESC, yc.condition_concept_id
+            ) AS rnum
+        FROM yearly_counts yc
+        )
+        SELECT
+        c.concept_name AS condition_name,
+        r.year
+        -- , r.patient_count
+        FROM ranked r
+        JOIN concept c ON c.concept_id = r.condition_concept_id
+        WHERE r.rnum <= 20
+        ORDER BY r.year, r.patient_count DESC, condition_name
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients with condition {0} grouped by year of diagnosis {1}.",
+            "patients_condition_group_by_year"
+        )
 
     def patients_drug_group_by_year(self):
 
-        pass
-    
-    def patients_group_by_gender_and_ethn(self):
+        query = """
+        WITH valid_drugs AS (
+        SELECT concept_id
+        FROM concept
+        WHERE domain_id = 'Drug'
+            AND standard_concept = 'S'
+            AND invalid_reason IS NULL
+        ),
+        exposures AS (
+        SELECT
+            de.person_id,
+            de.drug_concept_id,
+            de.drug_exposure_start_date::date AS start_date
+        FROM drug_exposure de
+        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        ),
+        yearly_counts AS (
+        SELECT
+            EXTRACT(YEAR FROM start_date)::int AS year,
+            drug_concept_id,
+            COUNT(DISTINCT person_id) AS patient_count
+        FROM exposures
+        GROUP BY 1, 2
+        ),
+        ranked AS (
+        SELECT
+            yc.year,
+            yc.drug_concept_id,
+            yc.patient_count,
+            ROW_NUMBER() OVER (
+            PARTITION BY yc.year
+            ORDER BY yc.patient_count DESC, yc.drug_concept_id
+            ) AS rnum
+        FROM yearly_counts yc
+        )
+        SELECT
+        c.concept_name AS drug_name,
+        r.year
+        -- , r.patient_count
+        FROM ranked r
+        JOIN concept c ON c.concept_id = r.drug_concept_id
+        WHERE r.rnum <= 20
+        ORDER BY r.year, r.patient_count DESC, drug_name
+        LIMIT 20;
+        """
+        results = self._run_query(query)
+        return self._process_results(
+            results,
+            "Counts of patients taking drug {0} grouped by year of prescription.",
+            "patients_drug_group_by_year"
+        )
 
-        pass
+    def patients_group_by_gender_and_ethn(self):
+        """
+        Number of patients grouped by gender and ethnicity.
+        """
+        text = "Number of patients grouped by gender and ethnicity."
+        query, params = self._get_template_sql("patients_group_by_gender_and_ethn")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]
 
     def patients_group_by_race(self):
+        """
+        Count of patients grouped by race.
+        """
+        text = "Count of patients grouped by race."
+        query, params = self._get_template_sql("patients_group_by_race")
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
 
-        pass
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        result = {
+            "id": self._id,
+            "text": text,
+            "sql": sql,
+            "result": query_result
+        }
+        self._id += 1
+        return [result]

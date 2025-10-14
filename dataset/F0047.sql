@@ -9,10 +9,10 @@ WITH st AS (
 
 SELECT
     pe1.year_of_birth,
-    st.state,
+    COALESCE(st.state, 'Unknown') AS state,
     COUNT(DISTINCT pe1.person_id)
 FROM person AS pe1
-INNER JOIN
+LEFT JOIN
     st
     ON pe1.location_id = st.location_id
 GROUP BY pe1.year_of_birth, st.state;

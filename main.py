@@ -1,6 +1,16 @@
 from sql_test import SqlTest
 import os
 import json
+from decimal import Decimal
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Decimal objects"""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            # Convert Decimal to int if it has no decimal places, else to float
+            return int(obj) if obj % 1 == 0 else float(obj)
+        return super().default(obj)
 
 
 def write_output(data):
@@ -8,9 +18,9 @@ def write_output(data):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     out_path = os.path.join(output_dir, "dataset.json")
-    
+
     with open(out_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        json.dump(data, f, indent=2, ensure_ascii=False, cls=DecimalEncoder)
 
 if __name__ == "__main__":
     test_generator = SqlTest() 
@@ -43,8 +53,32 @@ if __name__ == "__main__":
              test_generator.patients_drug_followed_drug,
              test_generator.patients_condition_ethnicity,
              test_generator.patients_drug_year,
-             
-
+             test_generator.patients_drug_after_condition,
+             test_generator.patients_drug_time_after_condition,
+             test_generator.patients_gender_condition,
+             test_generator.patients_year,
+             test_generator.patients_gender_state,
+             test_generator.patients_group_by_ethnicity_location,
+             test_generator.patients_group_by_ethnicity_birth,
+             test_generator.patients_group_by_ethnicity,
+             test_generator.patients_group_by_gender,
+             test_generator.patients_group_by_race_ethnicity,
+             test_generator.patients_grouped_by_race_gender,
+             test_generator.patients_group_by_race_location,
+             test_generator.patients_group_by_race_birth,
+             test_generator.patients_group_by_location,
+             test_generator.patients_group_by_birth_gender,
+             test_generator.patients_group_by_birth_location,
+             test_generator.patients_count,
+             test_generator.patients_count_by_ethnicity,
+             test_generator.patients_count_by_race,
+             test_generator.patients_count_by_gender,
+             test_generator.patients_drug,
+             test_generator.patients_condition,
+             test_generator.patients_condition_group_by_year,
+             test_generator.patients_drug_group_by_year,
+             test_generator.patients_group_by_gender_and_ethn,
+             test_generator.patients_group_by_race
 
              ] 
     

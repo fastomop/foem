@@ -9,8 +9,8 @@ WITH gender_concepts AS (
 )
 
 SELECT
-    gender,
+    COALESCE(gender, 'Unknown') AS gender,
     COUNT(DISTINCT pe1.person_id)
 FROM person pe1
-INNER JOIN gender_concepts gc ON pe1.gender_concept_id = gc.concept_id
+LEFT JOIN gender_concepts gc ON pe1.gender_concept_id = gc.concept_id
 GROUP BY gender;

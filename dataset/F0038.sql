@@ -1,11 +1,11 @@
 -- Number of patients grouped by ethnicity and year of birth.
 
 SELECT
-    ethnicity,
+    COALESCE(ethnicity, 'Unknown') AS ethnicity,
     year_of_birth,
     COUNT(DISTINCT pe1.person_id)
 FROM (
-    person AS pe1 INNER JOIN (
+    person AS pe1 LEFT JOIN (
         SELECT
             concept_id,
             concept_name AS ethnicity

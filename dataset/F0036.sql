@@ -9,11 +9,11 @@ WITH gt AS (
 )
 
 SELECT
-    gt.gender,
-    loc1.state,
+    COALESCE(gt.gender, 'Unknown') AS gender,
+    COALESCE(loc1.state, 'Unknown') AS state,
     COUNT(DISTINCT pe1.person_id) AS number_of_patients
 FROM person AS pe1
-INNER JOIN gt
+LEFT JOIN gt
     ON pe1.gender_concept_id = gt.concept_id
-INNER JOIN location AS loc1 ON pe1.location_id = loc1.location_id
+LEFT JOIN location AS loc1 ON pe1.location_id = loc1.location_id
 GROUP BY gt.gender, loc1.state;

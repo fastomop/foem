@@ -17,12 +17,12 @@ eth_temp1 AS (
 )
 
 SELECT
-    gen_temp1.gender,
-    eth_temp1.ethnicity,
+    COALESCE(gen_temp1.gender, 'Unknown') AS gender,
+    COALESCE(eth_temp1.ethnicity, 'Unknown') AS ethnicity,
     COUNT(DISTINCT pe1.person_id) AS number_of_patients
 FROM person AS pe1
-INNER JOIN gen_temp1
+LEFT JOIN gen_temp1
     ON pe1.gender_concept_id = gen_temp1.concept_id
-INNER JOIN eth_temp1
+LEFT JOIN eth_temp1
     ON pe1.ethnicity_concept_id = eth_temp1.concept_id
 GROUP BY gen_temp1.gender, eth_temp1.ethnicity;

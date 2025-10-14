@@ -1,11 +1,11 @@
 -- Number of patients grouped by race and ethnicity.
 
 SELECT
-    rt.race,
-    et.ethnicity,
+    COALESCE(rt.race, 'Unknown') AS race,
+    COALESCE(et.ethnicity, 'Unknown') AS ethnicity,
     COUNT(DISTINCT pe1.person_id)
 FROM ((
-    person AS pe1 INNER JOIN (
+    person AS pe1 LEFT JOIN (
         SELECT
             concept_id,
             concept_name AS race
@@ -13,7 +13,7 @@ FROM ((
         WHERE domain_id = 'Race' AND standard_concept = 'S'
     ) AS rt
         ON pe1.race_concept_id = rt.concept_id
-) INNER JOIN
+) LEFT JOIN
     (SELECT
         concept_id,
         concept_name AS ethnicity

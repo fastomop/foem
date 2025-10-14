@@ -9,10 +9,10 @@ WITH rt AS (
 )
 
 SELECT
-    rt.race,
+    COALESCE(rt.race, 'Unknown') AS race,
     pe1.year_of_birth,
     COUNT(DISTINCT pe1.person_id)
 FROM person AS pe1
-INNER JOIN rt
+LEFT JOIN rt
     ON pe1.race_concept_id = rt.concept_id
 GROUP BY rt.race, pe1.year_of_birth;

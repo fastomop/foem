@@ -9,9 +9,9 @@ WITH alias1 AS (
 )
 
 SELECT
-    ethnicity,
+    COALESCE(ethnicity, 'Unknown') AS ethnicity,
     COUNT(DISTINCT pe1.person_id)
 FROM person AS pe1
-INNER JOIN alias1
+LEFT JOIN alias1
     ON pe1.ethnicity_concept_id = concept_id
 GROUP BY ethnicity;
