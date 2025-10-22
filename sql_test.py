@@ -2,7 +2,6 @@ from config import get_db_connection
 from typing import Dict
 from contextlib import contextmanager
 from pathlib import Path
-import re
 
 class SqlTest:
 
@@ -250,13 +249,47 @@ class SqlTest:
                 query_result = cur.fetchall()
             output.append({
                 "id": self._id,
-                "text": text,
-                "sql": sql,
-                "result": query_result
+                "input": text,
+                "expected_output": sql,
+                "execution_result": query_result
             })
             self._id += 1
         return output
-    
+
+    def _add_result(self, text, query, params):
+        """
+        Centralized method to execute query and add result to output.
+
+        Args:
+            text: The description text
+            query: SQL query (or template name if params provided)
+            params: Parameters for the query template
+
+        Returns:
+            List with a single result dict
+        """
+        import re
+
+        # Get the SQL query string for display
+        sql_raw = self.__finalise_sql(query, params, self.conn)
+        sql = re.sub(r'\s+', ' ', sql_raw).strip()
+
+        # Execute query and get results
+        with self._cursor() as cur:
+            cur.execute(query, params)
+            query_result = cur.fetchall()
+
+        # Create result dict
+        result = {
+            "id": self._id,
+            "input": text,
+            "expected_output": sql,
+            "execution_result": query_result
+        }
+
+        self._id += 1
+        return [result]
+
     def __build_vocab_dict(self) -> dict:
         """
         Build a nested dict:
@@ -1445,21 +1478,7 @@ class SqlTest:
         """
         text = "Distribution of patients by year of birth."
         query, params = self._get_template_sql("patients_distribution_by_birth")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_condition_followed_condition(self):
 
@@ -2237,21 +2256,7 @@ class SqlTest:
         """
         text = "Number of patients by gender and state."
         query, params = self._get_template_sql("patients_gender_state")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_ethnicity_location(self):
         """
@@ -2259,21 +2264,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by ethnicity and residence state location."
         query, params = self._get_template_sql("patients_group_by_ethnicity_location")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_ethnicity_birth(self):
         """
@@ -2281,21 +2272,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by ethnicity and year of birth."
         query, params = self._get_template_sql("patients_group_by_ethnicity_birth")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_ethnicity(self):
         """
@@ -2303,21 +2280,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by ethnicity."
         query, params = self._get_template_sql("patients_group_by_ethnicity")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_gender(self):
         """
@@ -2325,21 +2288,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by gender."
         query, params = self._get_template_sql("patients_group_by_gender")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]   
+        return self._add_result(text, query, params)
 
     def patients_group_by_race_ethnicity(self):
         """
@@ -2347,21 +2296,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by race and ethnicity."
         query, params = self._get_template_sql("patients_group_by_race_ethnicity")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_grouped_by_race_gender(self):
         """
@@ -2369,21 +2304,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by race and gender."
         query, params = self._get_template_sql("patients_grouped_by_race_gender")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_race_location(self):
         """
@@ -2391,21 +2312,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by race and residence state location."
         query, params = self._get_template_sql("patients_group_by_race_location")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_race_birth(self):
         """
@@ -2413,21 +2320,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by race and year of birth."
         query, params = self._get_template_sql("patients_group_by_race_birth")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_location(self):
         """
@@ -2435,21 +2328,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by residence state location."
         query, params = self._get_template_sql("patients_group_by_location")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_birth_gender(self):
         """
@@ -2457,21 +2336,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by year of birth and gender."
         query, params = self._get_template_sql("patients_group_by_birth_gender")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_birth_location(self):
         """
@@ -2479,21 +2344,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by year of birth and residence state location."
         query, params = self._get_template_sql("patients_group_by_birth_location")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_count(self):
         """
@@ -2501,21 +2352,7 @@ class SqlTest:
         """
         text = "Number of patients in the dataset."
         query, params = self._get_template_sql("patients_count")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
     
     def patients_count_by_ethnicity(self):
 
@@ -2765,21 +2602,7 @@ class SqlTest:
         """
         text = "Number of patients grouped by gender and ethnicity."
         query, params = self._get_template_sql("patients_group_by_gender_and_ethn")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
 
     def patients_group_by_race(self):
         """
@@ -2787,18 +2610,4 @@ class SqlTest:
         """
         text = "Count of patients grouped by race."
         query, params = self._get_template_sql("patients_group_by_race")
-        sql_raw = self.__finalise_sql(query, params, self.conn)
-        sql = re.sub(r'\s+', ' ', sql_raw).strip()
-
-        with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
-
-        result = {
-            "id": self._id,
-            "text": text,
-            "sql": sql,
-            "result": query_result
-        }
-        self._id += 1
-        return [result]
+        return self._add_result(text, query, params)
