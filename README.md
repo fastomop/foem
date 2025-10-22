@@ -36,11 +36,35 @@ DB_CONNECTION_STRING=postgresql://USER:PASSWORD@HOST:PORT/DBNAME
 ```
 
 ## Usage
+
+### Running Tests
 Run the predefined SQL tests and write results to `dataset.json`:
 ```bash
 python main.py
 ```
 
+### Exporting to CSV
+Convert the JSON results to CSV format using the `csv_export` script:
+
+```bash
+# Export using execution_result field (default)
+python script/csv_export.py
+
+# Export using expected_output field
+python script/csv_export.py --type expected
+
+# Specify custom input/output paths
+python script/csv_export.py --input path/to/input.json --output path/to/output.csv
+```
+
+**Options:**
+- `--type` — Export type: `execution` (uses execution_result) or `expected` (uses expected_output). Default: `execution`
+- `--input` — Path to input JSON file. Default: `output/dataset.json`
+- `--output` — Path to output CSV file. Default: `output/dataset.csv`
+
+The exported CSV contains three columns: `id`, `input`, and `expected_output`. Single values are extracted directly, while multiple rows/columns are stored as JSON strings.
+
+### Customization
 Extend/customize:
 - Add/modify tests in **`validator.py`**
 - Add/modify templates in **`template.py`**
