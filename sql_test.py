@@ -363,7 +363,7 @@ class SqlTest:
         -- ,co_prescription_count AS person_count
         FROM drug_pairs
         ORDER BY co_prescription_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -405,7 +405,7 @@ class SqlTest:
         drug2_name
         FROM drug_pairs
         ORDER BY co_prescription_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -473,7 +473,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = sp.drug1
         JOIN concept c2 ON c2.concept_id = sp.drug2
         GROUP BY sp.drug1, c1.concept_name, sp.drug2, c2.concept_name
-        LIMIT 20;
+        LIMIT 1;
         """
 
         results = self._run_query(query)
@@ -546,7 +546,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.drug3_concept_id
         JOIN concept c4 ON c4.concept_id = q.drug4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -601,7 +601,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.drug3_concept_id
         JOIN concept c4 ON c4.concept_id = q.drug4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -690,7 +690,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = sq.drug3
         JOIN concept c4 ON c4.concept_id = sq.drug4
         GROUP BY sq.drug1, c1.concept_name, sq.drug2, c2.concept_name, sq.drug3, c3.concept_name, sq.drug4, c4.concept_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -740,12 +740,13 @@ class SqlTest:
         c1.concept_name AS drug1_name,
         c2.concept_name AS drug2_name,
         c3.concept_name AS drug3_name
+        -- ,t.person_count AS patients
         FROM triples t
         JOIN concept c1 ON c1.concept_id = t.drug1_concept_id
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
         JOIN concept c3 ON c3.concept_id = t.drug3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -794,7 +795,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
         JOIN concept c3 ON c3.concept_id = t.drug3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -862,7 +863,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = s.drug2
         JOIN concept c3 ON c3.concept_id = s.drug3
         ORDER BY s.patient_count
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -921,7 +922,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
-        LIMIT 20;
+        LIMIT 1;
         """
 
         result = None
@@ -984,7 +985,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1053,7 +1054,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = sp.cond1
         JOIN concept c2 ON c2.concept_id = sp.cond2
         GROUP BY sp.cond1, c1.concept_name, sp.cond2, c2.concept_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1115,7 +1116,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.cond3_concept_id
         JOIN concept c4 ON c4.concept_id = q.cond4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1175,7 +1176,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.cond3_concept_id
         JOIN concept c4 ON c4.concept_id = q.cond4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1269,7 +1270,7 @@ class SqlTest:
         sq.cond2, c2.concept_name,
         sq.cond3, c3.concept_name,
         sq.cond4, c4.concept_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1324,7 +1325,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
         JOIN concept c3 ON c3.concept_id = t.cond3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1380,7 +1381,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
         JOIN concept c3 ON c3.concept_id = t.cond3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1463,7 +1464,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = s.cond2
         JOIN concept c3 ON c3.concept_id = s.cond3
         ORDER BY s.patient_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1484,54 +1485,45 @@ class SqlTest:
 
         query = """
         WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+            SELECT c.concept_id
+            FROM concept c
+            WHERE c.domain_id = 'Condition'
+                AND c.standard_concept = 'S'
+                AND c.invalid_reason IS NULL
         ),
         occ AS (
-        SELECT
-            co.person_id,
-            co.condition_concept_id,
-            co.condition_start_date::date AS start_date,
-            co.condition_occurrence_id
-        FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+            SELECT
+                co.person_id,
+                co.condition_concept_id,
+                co.condition_start_date::date AS start_date
+            FROM condition_occurrence co
+            JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
         ),
-        ordered AS (
-        SELECT
-            person_id,
-            condition_concept_id AS cond1_id,
-            LEAD(condition_concept_id) OVER (
-            PARTITION BY person_id
-            ORDER BY start_date, condition_occurrence_id
-            ) AS cond2_id
-        FROM occ
-        ),
-        adjacent_pairs AS (
-        SELECT DISTINCT
-            person_id,
-            cond1_id,
-            cond2_id
-        FROM ordered
-        WHERE cond2_id IS NOT NULL
-            AND cond1_id <> cond2_id
+        condition_pairs AS (
+            SELECT DISTINCT
+                a.person_id,
+                a.condition_concept_id AS cond1_id,
+                b.condition_concept_id AS cond2_id
+            FROM occ a
+            JOIN occ b ON b.person_id = a.person_id
+                AND b.start_date > a.start_date
+                AND a.condition_concept_id <> b.condition_concept_id
         )
         SELECT
-        c1.concept_name AS condition1_name,
-        c2.concept_name AS condition2_name
-        FROM adjacent_pairs ap
-        JOIN concept c1 ON c1.concept_id = ap.cond1_id
-        JOIN concept c2 ON c2.concept_id = ap.cond2_id
+            c1.concept_name AS first_condition,
+            c2.concept_name AS second_condition
+            -- ,COUNT(DISTINCT cp.person_id) AS person_count
+        FROM condition_pairs cp
+        JOIN concept c1 ON c1.concept_id = cp.cond1_id
+        JOIN concept c2 ON c2.concept_id = cp.cond2_id
         GROUP BY c1.concept_name, c2.concept_name
-        ORDER BY COUNT(DISTINCT ap.person_id) DESC
-        LIMIT 20;
+        ORDER BY COUNT(DISTINCT cp.person_id) DESC
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
             results,
-            "How many people have Condition {0} followed by Condition {1}?",
+            "How many people have condition {0} followed by condition {1}?",
             "patients_condition_followed_condition"
         )
 
@@ -1573,12 +1565,12 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.cond_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
             results,
-            "How many people have Condition {1} more than 30 days after diagnosed by Condition {0}?",
+            "How many people have condition {1} more than 30 days after diagnosed by condition {0}?",
             "patients_condition_time_condition",
             30
         )
@@ -1630,7 +1622,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_condition_count DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1693,7 +1685,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1723,12 +1715,13 @@ class SqlTest:
         SELECT
             cp.condition_concept_id,
             cp.person_id,
-            COALESCE(l.state, 'Unknown') AS state_name
+            l.state AS state_name
         FROM cond_persons cp
         JOIN person p
             ON p.person_id = cp.person_id
-        LEFT JOIN location l
+        JOIN location l
             ON l.location_id = p.location_id
+        WHERE l.state IS NOT NULL
         ),
         counts AS (
         SELECT
@@ -1756,7 +1749,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1810,7 +1803,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1850,15 +1843,15 @@ class SqlTest:
         AND (e2.start_date - e1.start_date) >= 30
         )
         SELECT
-        c1.concept_name AS drug_a_name,
-        c2.concept_name AS drug_b_name
+        c2.concept_name AS drug_b_name,
+        c1.concept_name AS drug_a_name
         -- ,COUNT(DISTINCT p.person_id) AS patient_count
         FROM pairs p
         JOIN concept c1 ON c1.concept_id = p.drug_a
         JOIN concept c2 ON c2.concept_id = p.drug_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1916,7 +1909,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1979,7 +1972,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2033,7 +2026,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.drug_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, drug_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2095,7 +2088,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_concept_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2157,7 +2150,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_concept_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2223,7 +2216,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2241,7 +2234,7 @@ class SqlTest:
         FROM person p
         GROUP BY p.year_of_birth
         ORDER BY COUNT(*) DESC, year
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2435,7 +2428,7 @@ class SqlTest:
         ON c.concept_id = de.drug_concept_id
         GROUP BY c.concept_name
         ORDER BY COUNT(DISTINCT de.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2464,7 +2457,7 @@ class SqlTest:
         ON c.concept_id = co.condition_concept_id
         GROUP BY c.concept_name
         ORDER BY COUNT(DISTINCT co.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2486,7 +2479,7 @@ class SqlTest:
         WHERE l.state IS NOT NULL
         GROUP BY l.state
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2533,12 +2526,12 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.condition_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, condition_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(
             results,
-            "Counts of patients with condition {0} grouped by year of diagnosis {1}.",
+            "Counts of patients with condition {0} grouped by year of diagnosis.",
             "patients_condition_group_by_year"
         )
 
@@ -2587,7 +2580,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.drug_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, drug_name
-        LIMIT 20;
+        LIMIT 1;
         """
         results = self._run_query(query)
         return self._process_results(

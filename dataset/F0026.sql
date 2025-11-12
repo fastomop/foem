@@ -35,15 +35,13 @@ WITH
     )
 SELECT COUNT(DISTINCT p.person_id) AS number_of_patients
 FROM person p
-LEFT JOIN location l
+JOIN location l
     ON l.location_id = p.location_id
 JOIN condition_occurrence co
     ON co.person_id = p.person_id
 JOIN cond_concepts cc
     ON co.condition_concept_id = cc.concept_id
-WHERE 
-    CASE 
-        WHEN UPPER(TRIM(%(state)s)) = 'UNKNOWN' 
-        THEN (l.state IS NULL OR TRIM(l.state) = '')
-        ELSE UPPER(TRIM(COALESCE(l.state, ''))) = UPPER(TRIM(%(state)s))
-    END;
+WHERE l.state IS NOT NULL
+    AND TRIM(l.state) != ''
+    AND UPPER(TRIM(l.state)) != 'UNKNOWN'
+    AND UPPER(TRIM(l.state)) = UPPER(TRIM(%(state)s));
