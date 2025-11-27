@@ -1,4 +1,4 @@
-from sql_test import SqlTest
+from foem import SqlTest
 import os
 import json
 from decimal import Decimal
