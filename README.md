@@ -16,7 +16,7 @@ This project is a work in progress.
 
 ## Requirements
 - Python **3.8+**
-- PostgreSQL database
+- Database: PostgreSQL or Databricks SQL Warehouse
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 ## Installation
@@ -41,10 +41,33 @@ pip install -e .
 ```
 
 ## Configuration
-Create a **.env** file at the project root:
+
+Create a **.env** file at the project root with your database configuration:
+
+```bash
+# Copy the sample configuration file
+cp sample.env .env
+
+# Edit .env with your database credentials
+```
+
+### PostgreSQL Configuration (default)
 ```env
+DB_TYPE=postgresql
 DB_CONNECTION_STRING=postgresql://USER:PASSWORD@HOST:PORT/DBNAME
 ```
+
+### Databricks Configuration
+```env
+DB_TYPE=databricks
+DATABRICKS_SERVER_HOSTNAME=your-workspace.cloud.databricks.com
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/abc123def456
+DATABRICKS_ACCESS_TOKEN=your_personal_access_token
+DATABRICKS_CATALOG=main
+DATABRICKS_SCHEMA=default
+```
+
+**Note:** If `DB_TYPE` is not set, PostgreSQL is used by default. See [sample.env](sample.env) for detailed configuration instructions.
 
 ## Usage
 
@@ -98,6 +121,7 @@ foem/
 ├── dataset/            # SQL query templates and test data
 ├── output/             # Generated output files
 ├── main.py             # Entry point for running tests
+├── sample.env          # Sample environment configuration
 └── pyproject.toml      # Project configuration and dependencies
 ```
 
