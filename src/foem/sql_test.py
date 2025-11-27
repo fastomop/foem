@@ -1,4 +1,4 @@
-from config import get_db_connection
+from .config import get_db_connection
 from typing import Dict
 from contextlib import contextmanager
 from pathlib import Path
@@ -7,7 +7,8 @@ class SqlTest:
 
     def __init__(self, conn=None):
         self.conn = conn or get_db_connection()
-        self.dataset_dir = Path(__file__).parent / "dataset"
+        # Navigate to project root (two levels up from src/foem) and then to dataset
+        self.dataset_dir = Path(__file__).parent.parent.parent / "dataset"
         self.vocab_dict = self.__build_vocab_dict()
         self._id = 1
 
