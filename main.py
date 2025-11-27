@@ -24,7 +24,9 @@ def write_output(data):
 
 if __name__ == "__main__":
     test_generator = SqlTest() 
-    funcs = [test_generator.patients_2drugs_and_time,
+    funcs = [test_generator.patients_group_by_gender_and_ethn,
+             test_generator.patients_group_by_race,
+             test_generator.patients_2drugs_and_time,
              test_generator.patients_2drugs_and,
              test_generator.patients_2drugs_or,
              test_generator.patients_4drugs_and_time,
@@ -75,12 +77,14 @@ if __name__ == "__main__":
              test_generator.patients_count_by_gender,
              test_generator.patients_drug,
              test_generator.patients_condition,
+             test_generator.patients_count_by_location,
              test_generator.patients_condition_group_by_year,
-             test_generator.patients_drug_group_by_year,
-             test_generator.patients_group_by_gender_and_ethn,
-             test_generator.patients_group_by_race
-
+             test_generator.patients_drug_group_by_year
              ] 
+
+    # funcs = [
+    #          test_generator.patients_drug_after_condition,
+    #          ] 
     
     results = []
     for func in funcs:

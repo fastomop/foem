@@ -26,3 +26,4 @@ LEFT JOIN gen_temp1
 LEFT JOIN eth_temp1
     ON pe1.ethnicity_concept_id = eth_temp1.concept_id
 GROUP BY gen_temp1.gender, eth_temp1.ethnicity;
+
