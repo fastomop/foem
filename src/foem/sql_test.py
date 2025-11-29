@@ -1,16 +1,20 @@
 from .config import get_db_connection
+from .transpiler import transpile_query
 from typing import Dict
 from contextlib import contextmanager
 from pathlib import Path
+from sqlalchemy import text as sql_text
+import re
+import os
 
 class SqlTest:
 
-    def __init__(self, conn=None):
+    def __init__(self, conn=None, result_limit=1):
         self.conn = conn or get_db_connection()
-        # Navigate to project root (two levels up from src/foem) and then to dataset
         self.dataset_dir = Path(__file__).parent.parent.parent / "dataset"
         self.vocab_dict = self.__build_vocab_dict()
         self._id = 1
+        self.result_limit = result_limit
 
         # Mapping from template method names to SQL file numbers
         self.template_map = {
@@ -127,78 +131,75 @@ class SqlTest:
                     results.append((vocab_id, concept_code))
         return results
 
+    def _is_databricks(self) -> bool:
+        """Check if the current database connection is Databricks."""
+        db_type = os.getenv("DB_TYPE", "postgresql").lower()
+        return db_type == "databricks"
+
+    def _maybe_transpile(self, query: str) -> str:
+        """Transpile query from PostgreSQL to Databricks if using Databricks."""
+        if self._is_databricks():
+            try:
+                return transpile_query(query, source_dialect="postgres", target_dialect="databricks")
+            except Exception as e:
+                print(f"Warning: Failed to transpile query: {e}")
+                return query
+        return query
+
     @contextmanager
     def _cursor(self):
-        """Context manager for database cursor."""
-        cur = self.conn.cursor()
+        """Context manager for database connection."""
+        conn = self.conn.connect()
         try:
-            yield cur
+            yield conn
         finally:
-            cur.close()
+            conn.close()
 
     def _run_query(self, query: str, params=None):
-        """
-        Helper to execute a query and fetch all results.
-        """
+        """Helper to execute a query and fetch all results."""
+        query = self._maybe_transpile(query)
+        converted_query = re.sub(r'%\((\w+)\)s', r':\1', query)
+
         with self._cursor() as cur:
             if params:
-                cur.execute(query, params)
+                result = cur.execute(sql_text(converted_query), params)
             else:
-                cur.execute(query)
-            return cur.fetchall()
+                result = cur.execute(sql_text(converted_query))
+            return result.fetchall()
 
     def _process_results(self, results, text_template, template_method_name, *args):
-        """
-        Helper to process results, format text, read template from file, and return output data.
-        Each result is returned as a dict with fields: id, text, sql, result.
-        """
+        """Helper to process results, format text, read template from file, and return output data."""
         import re
         from decimal import Decimal
         output = []
         for row in results:
             text = text_template.format(*row)
-            # Get vocab and code IDs for each string value in the row
             ids = [self.find_code_by_name(val, self.vocab_dict) for val in row if isinstance(val, str)]
-            # ids is a list of lists of tuples: [[("RxNorm", "123")], [("ATC", "456")]]
-            # Flatten to list of tuples: [("RxNorm", "123"), ("ATC", "456")]
             ids_flat = [item for sublist in ids for item in sublist]
 
-            # Build parameters dict based on the template method
             params = {}
-            # Special handling for mixed condition+drug queries
             if 'drug_after_condition' in template_method_name or 'drug_time_after_condition' in template_method_name:
-                # For these queries: first value is condition, second is drug
-                # Template expects: v_id1, c_id1 for condition; v_id2, d_id1 for drug
                 if len(ids_flat) >= 2:
-                    # First concept is condition
                     params['v_id1'] = ids_flat[0][0]
                     params['c_id1'] = ids_flat[0][1]
-                    # Second concept is drug
                     params['v_id2'] = ids_flat[1][0]
                     params['d_id1'] = ids_flat[1][1]
             elif 'drugs' in template_method_name or 'drug' in template_method_name:
-                # For drug queries, map v_id and d_id parameters
-                # ids_flat is a list of tuples like [("RxNorm", "123"), ("ATC", "456")]
                 for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
                     params[f'v_id{idx}'] = vocab_id
                     params[f'd_id{idx}'] = code_id
             elif 'condition' in template_method_name:
-                # For condition queries, similar mapping
                 for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
                     params[f'v_id{idx}'] = vocab_id
                     params[f'c_id{idx}'] = code_id
 
-            # Add additional args (like days, age, etc.)
-            # For methods where numeric values come from query results (like age, year), extract from row
             if 'age' in template_method_name:
-                # For age queries, the age is typically the last non-string value in the row
                 age_values = [val for val in row if isinstance(val, (int, float, Decimal))]
                 if age_values:
                     params['age'] = int(age_values[-1])
                 elif args:
                     params['age'] = args[0]
             elif 'year' in template_method_name:
-                # For year queries, the year is typically the last non-string value in the row
                 year_values = [val for val in row if isinstance(val, (int, float, Decimal))]
                 if year_values:
                     params['year'] = int(year_values[-1])
@@ -207,47 +208,43 @@ class SqlTest:
             elif args:
                 if 'time' in template_method_name or 'days' in template_method_name:
                     params['days'] = args[0]
-            
-            # Handle string parameters like race, ethnicity, gender, state
-            # These are string values from the query results that need to be passed to the template
+
             string_values = [val for val in row if isinstance(val, str) and val not in [item for sublist in ids for item in sublist]]
-            
+
             if 'race' in template_method_name:
-                # For race queries, find the race name (string not in vocab_dict)
                 for val in row:
                     if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
                         params['race'] = val
                         break
-            
+
             if 'ethnicity' in template_method_name:
-                # For ethnicity queries, find the ethnicity name
                 for val in row:
                     if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
                         params['ethnicity'] = val
                         break
-            
+
             if 'gender' in template_method_name:
-                # For gender queries, find the gender value
                 for val in row:
                     if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
                         params['gender'] = val
                         break
-            
+
             if 'state' in template_method_name or 'location' in template_method_name:
-                # For state/location queries, find the state/location name
                 for val in row:
                     if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
                         params['state'] = val
-                        params['location'] = val  # Some templates use 'location' instead of 'state'
+                        params['location'] = val
                         break
 
             query, _ = self._read_template(template_method_name)
+            query = self._maybe_transpile(query)
             sql_raw = self.__finalise_sql(query, params, self.conn)
             sql = re.sub(r'\s+', ' ', sql_raw).strip()
 
+            converted_query = re.sub(r'%\((\w+)\)s', r':\1', query)
             with self._cursor() as cur:
-                cur.execute(sql)
-                query_result = cur.fetchall()
+                result = cur.execute(sql_text(converted_query), params)
+                query_result = result.fetchall()
             output.append({
                 "id": self._id,
                 "input": text,
@@ -269,16 +266,14 @@ class SqlTest:
         Returns:
             List with a single result dict
         """
-        import re
-
-        # Get the SQL query string for display
+        query = self._maybe_transpile(query)
         sql_raw = self.__finalise_sql(query, params, self.conn)
         sql = re.sub(r'\s+', ' ', sql_raw).strip()
+        converted_query = re.sub(r'%\((\w+)\)s', r':\1', query)
 
-        # Execute query and get results
         with self._cursor() as cur:
-            cur.execute(query, params)
-            query_result = cur.fetchall()
+            result = cur.execute(sql_text(converted_query), params)
+            query_result = result.fetchall()
 
         # Create result dict
         result = {
@@ -310,29 +305,40 @@ class SqlTest:
         vocab_dict: Dict[str, Dict[str, str]] = {}
 
         with self._cursor() as cur:
-            query = (
+            query = sql_text(
                 "SELECT concept_code, concept_name "
                 "FROM concept "
-                "WHERE vocabulary_id = %s "
-                "  AND domain_id = %s "
+                "WHERE vocabulary_id = :vocab "
+                "  AND domain_id = :domain "
                 "  AND standard_concept = 'S'"
             )
 
             for domain, vocab_list in vocabularies.items():
                 for vocab in vocab_list:
-                    cur.execute(query, (vocab, domain))
-                    rows = cur.fetchall()
+                    result = cur.execute(query, {"vocab": vocab, "domain": domain})
+                    rows = result.fetchall()
                     vocab_dict[vocab] = {code: name for code, name in rows}
 
         return vocab_dict
     
-    def __finalise_sql(self, sql: str, params: dict, conn) -> str: 
-        with self._cursor() as cur:
-            return cur.mogrify(sql, params).decode("utf-8")
+    def __finalise_sql(self, sql: str, params: dict, conn) -> str:
+        """
+        Compile SQL query with parameters for display purposes.
+        This converts parameterized queries into their final form.
+        """
+        # Convert %(param)s format to :param format for SQLAlchemy
+        converted_sql = re.sub(r'%\((\w+)\)s', r':\1', sql)
+
+        compiled = sql_text(converted_sql).bindparams(**params)
+        compiled_query = compiled.compile(
+            dialect=self.conn.dialect,
+            compile_kwargs={"literal_binds": True}
+        )
+        return str(compiled_query)
 
     def patients_2drugs_and_time(self):
-        
-        query = """
+
+        query = f"""
         WITH drug_pairs AS (
         SELECT
             de1.drug_concept_id AS drug1_concept_id,
@@ -364,7 +370,7 @@ class SqlTest:
         -- ,co_prescription_count AS person_count
         FROM drug_pairs
         ORDER BY co_prescription_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -376,7 +382,7 @@ class SqlTest:
     
     def patients_2drugs_and(self):
         
-        query = """
+        query = f"""
         WITH drug_pairs AS (
         SELECT
             de1.drug_concept_id AS drug1_concept_id,
@@ -406,7 +412,7 @@ class SqlTest:
         drug2_name
         FROM drug_pairs
         ORDER BY co_prescription_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -417,7 +423,7 @@ class SqlTest:
 
     def patients_2drugs_or(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT concept_id
         FROM concept
@@ -474,7 +480,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = sp.drug1
         JOIN concept c2 ON c2.concept_id = sp.drug2
         GROUP BY sp.drug1, c1.concept_name, sp.drug2, c2.concept_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
 
         results = self._run_query(query)
@@ -486,7 +492,7 @@ class SqlTest:
 
     def patients_4drugs_and_time(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT c.concept_id
         FROM concept c
@@ -547,7 +553,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.drug3_concept_id
         JOIN concept c4 ON c4.concept_id = q.drug4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -559,7 +565,7 @@ class SqlTest:
 
     def patients_4drugs_and(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT c.concept_id
         FROM concept c
@@ -602,7 +608,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.drug3_concept_id
         JOIN concept c4 ON c4.concept_id = q.drug4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -613,7 +619,7 @@ class SqlTest:
 
     def patients_4drugs_or(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT concept_id
         FROM concept
@@ -691,7 +697,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = sq.drug3
         JOIN concept c4 ON c4.concept_id = sq.drug4
         GROUP BY sq.drug1, c1.concept_name, sq.drug2, c2.concept_name, sq.drug3, c3.concept_name, sq.drug4, c4.concept_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -702,7 +708,7 @@ class SqlTest:
 
     def patients_3drugs_and_time(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT c.concept_id
         FROM concept c
@@ -747,7 +753,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
         JOIN concept c3 ON c3.concept_id = t.drug3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -759,7 +765,7 @@ class SqlTest:
 
     def patients_3drugs_and(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT c.concept_id
         FROM concept c
@@ -796,7 +802,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
         JOIN concept c3 ON c3.concept_id = t.drug3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -807,7 +813,7 @@ class SqlTest:
 
     def patients_3drugs_or(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT concept_id
         FROM concept
@@ -864,7 +870,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = s.drug2
         JOIN concept c3 ON c3.concept_id = s.drug3
         ORDER BY s.patient_count
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -875,7 +881,7 @@ class SqlTest:
 
     def patients_2conditions_and_time(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
             SELECT concept_id
             FROM concept
@@ -923,14 +929,14 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
-
+        query = self._maybe_transpile(query)
         result = None
         with self._cursor() as cur:
 
-            cur.execute(query)
-            result = cur.fetchall()
+            query_result = cur.execute(sql_text(query))
+            result = query_result.fetchall()
 
         return self._process_results(
             result,
@@ -941,7 +947,7 @@ class SqlTest:
 
     def patients_2conditions_and(self):
         
-        query = """
+        query = f"""
         WITH valid_conditions AS (
             SELECT concept_id
             FROM concept
@@ -986,7 +992,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -997,7 +1003,7 @@ class SqlTest:
     
     def patients_2conditions_or(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
             SELECT concept_id
             FROM concept
@@ -1055,7 +1061,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = sp.cond1
         JOIN concept c2 ON c2.concept_id = sp.cond2
         GROUP BY sp.cond1, c1.concept_name, sp.cond2, c2.concept_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1066,7 +1072,7 @@ class SqlTest:
 
     def patients_4conditions_and_time(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1117,7 +1123,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.cond3_concept_id
         JOIN concept c4 ON c4.concept_id = q.cond4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1129,7 +1135,7 @@ class SqlTest:
 
     def patients_4conditions_and(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1177,7 +1183,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.cond3_concept_id
         JOIN concept c4 ON c4.concept_id = q.cond4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1188,7 +1194,7 @@ class SqlTest:
 
     def patients_4conditions_or(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT concept_id
         FROM concept
@@ -1271,7 +1277,7 @@ class SqlTest:
         sq.cond2, c2.concept_name,
         sq.cond3, c3.concept_name,
         sq.cond4, c4.concept_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1282,7 +1288,7 @@ class SqlTest:
 
     def patients_3conditions_and_time(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1326,7 +1332,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
         JOIN concept c3 ON c3.concept_id = t.cond3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1338,7 +1344,7 @@ class SqlTest:
 
     def patients_3conditions_and(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
             SELECT c.concept_id
             FROM concept c
@@ -1382,7 +1388,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
         JOIN concept c3 ON c3.concept_id = t.cond3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1393,7 +1399,7 @@ class SqlTest:
     
     def patients_3conditions_or(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT concept_id
         FROM concept
@@ -1465,7 +1471,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = s.cond2
         JOIN concept c3 ON c3.concept_id = s.cond3
         ORDER BY s.patient_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1484,7 +1490,7 @@ class SqlTest:
 
     def patients_condition_followed_condition(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
             SELECT c.concept_id
             FROM concept c
@@ -1519,7 +1525,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = cp.cond2_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT cp.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1530,7 +1536,7 @@ class SqlTest:
 
     def patients_condition_time_condition(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1566,7 +1572,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.cond_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1578,7 +1584,7 @@ class SqlTest:
 
     def patients_condition_age(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1623,7 +1629,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_condition_count DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1634,7 +1640,7 @@ class SqlTest:
 
     def patients_condition_race(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1686,7 +1692,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1697,7 +1703,7 @@ class SqlTest:
 
     def patients_condition_state(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1750,7 +1756,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1761,7 +1767,7 @@ class SqlTest:
 
     def patients_condition_year(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1804,7 +1810,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1815,7 +1821,7 @@ class SqlTest:
 
     def patients_drug_time_drug(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT c.concept_id
         FROM concept c
@@ -1852,7 +1858,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1864,7 +1870,7 @@ class SqlTest:
 
     def patients_drug_followed_drug(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT c.concept_id
         FROM concept c
@@ -1910,7 +1916,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1921,7 +1927,7 @@ class SqlTest:
 
     def patients_condition_ethnicity(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -1973,7 +1979,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1984,7 +1990,7 @@ class SqlTest:
 
     def patients_drug_year(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT concept_id
         FROM concept
@@ -2027,7 +2033,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.drug_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, drug_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2038,7 +2044,7 @@ class SqlTest:
 
     def patients_drug_after_condition(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -2089,7 +2095,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_concept_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2100,7 +2106,7 @@ class SqlTest:
 
     def patients_drug_time_after_condition(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -2151,7 +2157,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_concept_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2163,7 +2169,7 @@ class SqlTest:
 
     def patients_gender_condition(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT c.concept_id
         FROM concept c
@@ -2217,7 +2223,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2228,14 +2234,14 @@ class SqlTest:
     
     def patients_year(self):
 
-        query = """
+        query = f"""
         SELECT
         p.year_of_birth AS year
         -- , COUNT(*)        AS patient_count
         FROM person p
         GROUP BY p.year_of_birth
         ORDER BY COUNT(*) DESC, year
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2350,7 +2356,7 @@ class SqlTest:
     
     def patients_count_by_ethnicity(self):
 
-        query = """
+        query = f"""
         SELECT
         COALESCE(c.concept_name, 'Unknown') AS ethnicity
         --, COUNT(*) AS patient_count
@@ -2369,7 +2375,7 @@ class SqlTest:
 
     def patients_count_by_race(self):
 
-        query = """
+        query = f"""
         SELECT
         c.concept_name AS race
         --, COUNT(*) AS patient_count
@@ -2389,7 +2395,7 @@ class SqlTest:
 
     def patients_count_by_gender(self):
 
-        query = """
+        query = f"""
         SELECT
         COALESCE(c.concept_name, 'Unknown') AS gender
         -- ,COUNT(*) AS patient_count
@@ -2411,7 +2417,7 @@ class SqlTest:
     
     def patients_drug(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT concept_id
         FROM concept
@@ -2429,7 +2435,7 @@ class SqlTest:
         ON c.concept_id = de.drug_concept_id
         GROUP BY c.concept_name
         ORDER BY COUNT(DISTINCT de.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2440,7 +2446,7 @@ class SqlTest:
 
     def patients_condition(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT concept_id
         FROM concept
@@ -2458,7 +2464,7 @@ class SqlTest:
         ON c.concept_id = co.condition_concept_id
         GROUP BY c.concept_name
         ORDER BY COUNT(DISTINCT co.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2471,7 +2477,7 @@ class SqlTest:
         """
         Number of patients grouped by residence state location.
         """
-        query = """
+        query = f"""
         SELECT
         l.state AS location
         -- ,COUNT(DISTINCT p.person_id) AS patient_count
@@ -2480,7 +2486,7 @@ class SqlTest:
         WHERE l.state IS NOT NULL
         GROUP BY l.state
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2491,7 +2497,7 @@ class SqlTest:
 
     def patients_condition_group_by_year(self):
 
-        query = """
+        query = f"""
         WITH valid_conditions AS (
         SELECT concept_id
         FROM concept
@@ -2527,7 +2533,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.condition_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, condition_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2538,7 +2544,7 @@ class SqlTest:
 
     def patients_drug_group_by_year(self):
 
-        query = """
+        query = f"""
         WITH valid_drugs AS (
         SELECT concept_id
         FROM concept
@@ -2581,7 +2587,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.drug_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, drug_name
-        LIMIT 1;
+        LIMIT {self.result_limit};
         """
         results = self._run_query(query)
         return self._process_results(

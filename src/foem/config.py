@@ -1,12 +1,11 @@
 import os
 from dotenv import load_dotenv
-from urllib.parse import urlparse
-import psycopg2
-from databricks import sql
+from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 
 load_dotenv()
 
-def get_db_connection():
+def get_db_connection() -> Engine:
     """
     Get database connection based on DB_TYPE environment variable.
 
@@ -15,34 +14,25 @@ def get_db_connection():
     - Databricks: DB_TYPE=databricks
 
     Returns:
-        Database connection object
+        SQLAlchemy Engine object
     """
     db_type = os.getenv("DB_TYPE", "postgresql").lower()
 
     if db_type == "databricks":
-        return _get_databricks_connection()
+        return _get_databricks_engine()
     else:
-        return _get_postgresql_connection()
+        return _get_postgresql_engine()
 
 
-def _get_postgresql_connection():
-    """Get PostgreSQL connection using psycopg2."""
-
+def _get_postgresql_engine() -> Engine:
+    """Get PostgreSQL engine using SQLAlchemy."""
     db_url = os.getenv("DB_CONNECTION_STRING")
-    parsed = urlparse(db_url)
-
-    return psycopg2.connect(
-        dbname=parsed.path[1:],
-        user=parsed.username,
-        password=parsed.password,
-        host=parsed.hostname,
-        port=parsed.port,
-    )
+    return create_engine(db_url)
 
 
-def _get_databricks_connection():
+def _get_databricks_engine() -> Engine:
     """
-    Get Databricks connection using databricks-sql-connector.
+    Get Databricks engine using SQLAlchemy with databricks-sql-connector.
 
     Environment variables required:
     - DATABRICKS_SERVER_HOSTNAME: Databricks workspace hostname
@@ -66,10 +56,10 @@ def _get_databricks_connection():
             "DATABRICKS_HTTP_PATH, and DATABRICKS_ACCESS_TOKEN environment variables"
         )
 
-    return sql.connect(
-        server_hostname=server_hostname,
-        http_path=http_path,
-        access_token=access_token,
-        catalog=catalog,
-        schema=schema
+    # Construct Databricks SQLAlchemy connection string
+    connection_string = (
+        f"databricks://token:{access_token}@{server_hostname}?"
+        f"http_path={http_path}&catalog={catalog}&schema={schema}"
     )
+
+    return create_engine(connection_string)
