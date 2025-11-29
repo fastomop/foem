@@ -331,9 +331,18 @@ class SqlTest:
             return cur.mogrify(sql, params).decode("utf-8")
 
     def patients_2drugs_and_time(self):
-        
+
         query = """
-        WITH drug_pairs AS (
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
+        ),
+        drug_pairs AS (
         SELECT
             de1.drug_concept_id AS drug1_concept_id,
             de2.drug_concept_id AS drug2_concept_id,
@@ -347,7 +356,9 @@ class SqlTest:
         JOIN concept c1 ON de1.drug_concept_id = c1.concept_id
         JOIN concept c2 ON de2.drug_concept_id = c2.concept_id
         WHERE
-            ABS(de1.drug_exposure_start_date - de2.drug_exposure_start_date) <= 30
+            de1.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
+            AND de2.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
+            AND ABS(de1.drug_exposure_start_date - de2.drug_exposure_start_date) <= 30
             AND c1.domain_id = 'Drug'
             AND c2.domain_id = 'Drug'
             AND c1.invalid_reason IS NULL
@@ -364,7 +375,7 @@ class SqlTest:
         -- ,co_prescription_count AS person_count
         FROM drug_pairs
         ORDER BY co_prescription_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -375,9 +386,18 @@ class SqlTest:
         )
     
     def patients_2drugs_and(self):
-        
+
         query = """
-        WITH drug_pairs AS (
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
+        ),
+        drug_pairs AS (
         SELECT
             de1.drug_concept_id AS drug1_concept_id,
             de2.drug_concept_id AS drug2_concept_id,
@@ -391,7 +411,9 @@ class SqlTest:
         JOIN concept c1 ON de1.drug_concept_id = c1.concept_id
         JOIN concept c2 ON de2.drug_concept_id = c2.concept_id
         WHERE
-            c1.domain_id = 'Drug'
+            de1.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
+            AND de2.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
+            AND c1.domain_id = 'Drug'
             AND c2.domain_id = 'Drug'
             AND c1.invalid_reason IS NULL
             AND c2.invalid_reason IS NULL
@@ -406,7 +428,7 @@ class SqlTest:
         drug2_name
         FROM drug_pairs
         ORDER BY co_prescription_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -418,12 +440,14 @@ class SqlTest:
     def patients_2drugs_or(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Drug'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_era de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         eras AS (
         SELECT
@@ -432,7 +456,7 @@ class SqlTest:
             de.drug_era_start_date AS start_date,
             de.drug_era_end_date   AS end_date
         FROM drug_era de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         cooccur_pairs AS (
         SELECT
@@ -474,7 +498,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = sp.drug1
         JOIN concept c2 ON c2.concept_id = sp.drug2
         GROUP BY sp.drug1, c1.concept_name, sp.drug2, c2.concept_name
-        LIMIT 1;
+        LIMIT 20;
         """
 
         results = self._run_query(query)
@@ -487,12 +511,14 @@ class SqlTest:
     def patients_4drugs_and_time(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT DISTINCT
@@ -501,7 +527,7 @@ class SqlTest:
                 de.drug_exposure_start_date::date AS start_date,
                 COALESCE(de.drug_exposure_end_date::date, de.drug_exposure_start_date::date) AS end_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         quads AS (
         SELECT
@@ -547,7 +573,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.drug3_concept_id
         JOIN concept c4 ON c4.concept_id = q.drug4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -560,17 +586,19 @@ class SqlTest:
     def patients_4drugs_and(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         person_drugs AS (
         SELECT DISTINCT de.person_id, de.drug_concept_id
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         quads AS (
         SELECT
@@ -602,7 +630,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.drug3_concept_id
         JOIN concept c4 ON c4.concept_id = q.drug4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -614,12 +642,14 @@ class SqlTest:
     def patients_4drugs_or(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Drug'
-        AND standard_concept = 'S'
-        AND invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_era de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         eras AS (
             SELECT
@@ -628,7 +658,7 @@ class SqlTest:
                 de.drug_era_start_date AS start_date,
                 de.drug_era_end_date   AS end_date
             FROM drug_era de
-            JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+            WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         cooccur_quads AS (
             SELECT
@@ -691,7 +721,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = sq.drug3
         JOIN concept c4 ON c4.concept_id = sq.drug4
         GROUP BY sq.drug1, c1.concept_name, sq.drug2, c2.concept_name, sq.drug3, c3.concept_name, sq.drug4, c4.concept_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -703,12 +733,14 @@ class SqlTest:
     def patients_3drugs_and_time(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT DISTINCT
@@ -716,7 +748,7 @@ class SqlTest:
                 de.drug_concept_id,
                 de.drug_exposure_start_date::date AS start_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         triples AS (
         SELECT
@@ -747,7 +779,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
         JOIN concept c3 ON c3.concept_id = t.drug3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -760,17 +792,19 @@ class SqlTest:
     def patients_3drugs_and(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         person_drugs AS (  -- one row per person per drug (no dates needed)
         SELECT DISTINCT de.person_id, de.drug_concept_id
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         triples AS (
         SELECT
@@ -796,7 +830,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
         JOIN concept c3 ON c3.concept_id = t.drug3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -808,10 +842,14 @@ class SqlTest:
     def patients_3drugs_or(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Drug' AND standard_concept = 'S' AND invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_era de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         eras AS (
         SELECT de.person_id,
@@ -819,7 +857,7 @@ class SqlTest:
                 de.drug_era_start_date AS start_date,
                 de.drug_era_end_date   AS end_date
         FROM drug_era de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         cooccur_triples AS (
         SELECT e1.person_id,
@@ -864,7 +902,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = s.drug2
         JOIN concept c3 ON c3.concept_id = s.drug3
         ORDER BY s.patient_count
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -876,12 +914,14 @@ class SqlTest:
     def patients_2conditions_and_time(self):
 
         query = """
-        WITH valid_conditions AS (
-            SELECT concept_id
-            FROM concept
-            WHERE domain_id = 'Condition'
-                AND standard_concept = 'S'
-                AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         occ AS (
         SELECT
@@ -889,8 +929,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc
-            ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         pairs_per_patient AS (
         -- make one row per patient per condition pair that’s within 30 days
@@ -923,7 +962,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
-        LIMIT 1;
+        LIMIT 20;
         """
 
         result = None
@@ -940,14 +979,16 @@ class SqlTest:
         )
 
     def patients_2conditions_and(self):
-        
+
         query = """
-        WITH valid_conditions AS (
-            SELECT concept_id
-            FROM concept
-            WHERE domain_id = 'Condition'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         occ AS (
             SELECT
@@ -955,8 +996,7 @@ class SqlTest:
                 co.condition_concept_id,
                 co.condition_start_date
             FROM condition_occurrence co
-            JOIN valid_conditions vc
-            ON vc.concept_id = co.condition_concept_id
+            WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         pairs_per_patient AS (
             SELECT
@@ -986,7 +1026,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = pc.cond1_id
         JOIN concept c2 ON c2.concept_id = pc.cond2_id
         ORDER BY pc.patient_count DESC, condition1_name, condition2_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -998,12 +1038,14 @@ class SqlTest:
     def patients_2conditions_or(self):
 
         query = """
-        WITH valid_conditions AS (
-            SELECT concept_id
-            FROM concept
-            WHERE domain_id = 'Condition'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT ce.condition_concept_id
+        FROM condition_era ce
+        JOIN concept c ON c.concept_id = ce.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY ce.condition_concept_id
+        ORDER BY COUNT(DISTINCT ce.person_id) DESC
+        LIMIT 10
         ),
         eras AS (
             SELECT
@@ -1012,7 +1054,7 @@ class SqlTest:
                 ce.condition_era_start_date AS start_date,
                 ce.condition_era_end_date   AS end_date
             FROM condition_era ce
-            JOIN valid_conditions vc ON vc.concept_id = ce.condition_concept_id
+            WHERE ce.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         cooccur_pairs AS (
             SELECT
@@ -1055,7 +1097,7 @@ class SqlTest:
         JOIN concept c1 ON c1.concept_id = sp.cond1
         JOIN concept c2 ON c2.concept_id = sp.cond2
         GROUP BY sp.cond1, c1.concept_name, sp.cond2, c2.concept_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1067,12 +1109,14 @@ class SqlTest:
     def patients_4conditions_and_time(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT DISTINCT
@@ -1080,7 +1124,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date::date AS start_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         quads AS (
         SELECT
@@ -1117,7 +1161,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.cond3_concept_id
         JOIN concept c4 ON c4.concept_id = q.cond4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1130,12 +1174,14 @@ class SqlTest:
     def patients_4conditions_and(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT DISTINCT
@@ -1143,7 +1189,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date::date AS start_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         quads AS (
         SELECT
@@ -1177,7 +1223,7 @@ class SqlTest:
         JOIN concept c3 ON c3.concept_id = q.cond3_concept_id
         JOIN concept c4 ON c4.concept_id = q.cond4_concept_id
         ORDER BY q.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1189,12 +1235,14 @@ class SqlTest:
     def patients_4conditions_or(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Condition'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT ce.condition_concept_id
+        FROM condition_era ce
+        JOIN concept c ON c.concept_id = ce.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY ce.condition_concept_id
+        ORDER BY COUNT(DISTINCT ce.person_id) DESC
+        LIMIT 10
         ),
         eras AS (
         SELECT
@@ -1203,7 +1251,7 @@ class SqlTest:
             ce.condition_era_start_date AS start_date,
             ce.condition_era_end_date   AS end_date
         FROM condition_era ce
-        JOIN valid_conditions vc ON vc.concept_id = ce.condition_concept_id
+        WHERE ce.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         cooccur_quads AS (
         SELECT
@@ -1271,7 +1319,7 @@ class SqlTest:
         sq.cond2, c2.concept_name,
         sq.cond3, c3.concept_name,
         sq.cond4, c4.concept_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1283,12 +1331,14 @@ class SqlTest:
     def patients_3conditions_and_time(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT DISTINCT
@@ -1296,7 +1346,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date::date AS start_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         triads AS (
         SELECT
@@ -1326,7 +1376,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
         JOIN concept c3 ON c3.concept_id = t.cond3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1339,12 +1389,14 @@ class SqlTest:
     def patients_3conditions_and(self):
 
         query = """
-        WITH valid_conditions AS (
-            SELECT c.concept_id
-            FROM concept c
-            WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
             SELECT DISTINCT
@@ -1352,7 +1404,7 @@ class SqlTest:
                 co.condition_concept_id,
                 co.condition_start_date::date AS start_date
             FROM condition_occurrence co
-            JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+            WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         triads AS (
             SELECT
@@ -1382,7 +1434,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = t.cond2_concept_id
         JOIN concept c3 ON c3.concept_id = t.cond3_concept_id
         ORDER BY t.person_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1394,12 +1446,14 @@ class SqlTest:
     def patients_3conditions_or(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Condition'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT ce.condition_concept_id
+        FROM condition_era ce
+        JOIN concept c ON c.concept_id = ce.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY ce.condition_concept_id
+        ORDER BY COUNT(DISTINCT ce.person_id) DESC
+        LIMIT 10
         ),
         eras AS (
         SELECT
@@ -1408,7 +1462,7 @@ class SqlTest:
             ce.condition_era_start_date AS start_date,
             ce.condition_era_end_date   AS end_date
         FROM condition_era ce
-        JOIN valid_conditions vc ON vc.concept_id = ce.condition_concept_id
+        WHERE ce.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         cooccur_triples AS (
         SELECT
@@ -1465,7 +1519,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = s.cond2
         JOIN concept c3 ON c3.concept_id = s.cond3
         ORDER BY s.patient_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1485,12 +1539,14 @@ class SqlTest:
     def patients_condition_followed_condition(self):
 
         query = """
-        WITH valid_conditions AS (
-            SELECT c.concept_id
-            FROM concept c
-            WHERE c.domain_id = 'Condition'
-                AND c.standard_concept = 'S'
-                AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         occ AS (
             SELECT
@@ -1498,7 +1554,7 @@ class SqlTest:
                 co.condition_concept_id,
                 co.condition_start_date::date AS start_date
             FROM condition_occurrence co
-            JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+            WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         condition_pairs AS (
             SELECT DISTINCT
@@ -1519,7 +1575,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = cp.cond2_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT cp.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1531,12 +1587,14 @@ class SqlTest:
     def patients_condition_time_condition(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         occ AS (
         SELECT
@@ -1544,7 +1602,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date::date AS start_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         pairs AS (
         -- one row per (person, A, B) where B happens at least 30 days after A
@@ -1566,7 +1624,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.cond_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1579,12 +1637,14 @@ class SqlTest:
     def patients_condition_age(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         condition_ages AS (
         SELECT
@@ -1593,8 +1653,7 @@ class SqlTest:
         FROM condition_occurrence co
         JOIN person p
             ON p.person_id = co.person_id
-        JOIN valid_conditions vc
-            ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         counts AS (
         SELECT
@@ -1623,7 +1682,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_condition_count DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1635,19 +1694,21 @@ class SqlTest:
     def patients_condition_race(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         cond_persons AS (
         SELECT DISTINCT
             co.person_id,
             co.condition_concept_id
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         race_labeled AS (
         SELECT
@@ -1686,7 +1747,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1698,19 +1759,21 @@ class SqlTest:
     def patients_condition_state(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         cond_persons AS (
         SELECT DISTINCT
             co.person_id,
             co.condition_concept_id
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         state_labeled AS (
         SELECT
@@ -1750,7 +1813,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1762,12 +1825,14 @@ class SqlTest:
     def patients_condition_year(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         condition_years AS (
         SELECT
@@ -1775,8 +1840,8 @@ class SqlTest:
             co.person_id,
             EXTRACT(YEAR FROM co.condition_start_date)::int AS year
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
-        WHERE co.condition_start_date IS NOT NULL
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
+        AND co.condition_start_date IS NOT NULL
         ),
         counts AS (
         SELECT
@@ -1804,7 +1869,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1816,12 +1881,14 @@ class SqlTest:
     def patients_drug_time_drug(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         exp AS (
         SELECT
@@ -1829,7 +1896,7 @@ class SqlTest:
             de.drug_concept_id,
             de.drug_exposure_start_date::date AS start_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         pairs AS (
         -- one row per (person, A, B) where B starts at least 30 days after A
@@ -1852,7 +1919,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1865,12 +1932,14 @@ class SqlTest:
     def patients_drug_followed_drug(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         exp AS (
         SELECT
@@ -1879,7 +1948,7 @@ class SqlTest:
             de.drug_exposure_start_date::date AS start_date,
             de.drug_exposure_id
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         ordered AS (
         -- order exposures per patient by date (and exposure_id to break ties)
@@ -1910,7 +1979,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_b
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1922,19 +1991,21 @@ class SqlTest:
     def patients_condition_ethnicity(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         cond_persons AS (
         SELECT DISTINCT
             co.person_id,
             co.condition_concept_id
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         ethnicity_labeled AS (
         SELECT
@@ -1973,7 +2044,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -1985,12 +2056,14 @@ class SqlTest:
     def patients_drug_year(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Drug'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT
@@ -1998,7 +2071,7 @@ class SqlTest:
             de.drug_concept_id,
             de.drug_exposure_start_date::date AS start_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         yearly_counts AS (
         SELECT
@@ -2027,7 +2100,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.drug_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, drug_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2039,19 +2112,21 @@ class SqlTest:
     def patients_drug_after_condition(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
-        valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        top_drugs AS (
+        SELECT drug_concept_id
+        FROM drug_exposure
+        GROUP BY drug_concept_id
+        ORDER BY COUNT(DISTINCT person_id) DESC
+        LIMIT 15
         ),
         cond_occ AS (
         SELECT
@@ -2059,7 +2134,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date::date AS cond_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         drug_exp AS (
         SELECT
@@ -2067,7 +2142,7 @@ class SqlTest:
             de.drug_concept_id,
             de.drug_exposure_start_date::date AS drug_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         pairs AS (
         -- one row per (person, condition, drug) where drug starts after condition
@@ -2089,7 +2164,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_concept_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2101,19 +2176,21 @@ class SqlTest:
     def patients_drug_time_after_condition(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
-        valid_drugs AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Drug'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        top_drugs AS (
+        SELECT drug_concept_id
+        FROM drug_exposure
+        GROUP BY drug_concept_id
+        ORDER BY COUNT(DISTINCT person_id) DESC
+        LIMIT 15
         ),
         cond_occ AS (
         SELECT
@@ -2121,7 +2198,7 @@ class SqlTest:
             co.condition_concept_id,
             co.condition_start_date::date AS cond_date
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         drug_exp AS (
         SELECT
@@ -2129,7 +2206,7 @@ class SqlTest:
             de.drug_concept_id,
             de.drug_exposure_start_date::date AS drug_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         pairs AS (
         -- one row per (person, condition, drug) where drug starts more than 30 days after condition
@@ -2151,7 +2228,7 @@ class SqlTest:
         JOIN concept c2 ON c2.concept_id = p.drug_concept_id
         GROUP BY c1.concept_name, c2.concept_name
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2164,19 +2241,21 @@ class SqlTest:
     def patients_gender_condition(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT c.concept_id
-        FROM concept c
-        WHERE c.domain_id = 'Condition'
-            AND c.standard_concept = 'S'
-            AND c.invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         cond_persons AS (
         SELECT DISTINCT
             co.person_id,
             co.condition_concept_id
         FROM condition_occurrence co
-        JOIN valid_conditions vc ON vc.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         ),
         gender_labeled AS (
         SELECT
@@ -2217,7 +2296,7 @@ class SqlTest:
         FROM ranked
         WHERE rnk = 1
         ORDER BY total_patients DESC, condition_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2235,7 +2314,7 @@ class SqlTest:
         FROM person p
         GROUP BY p.year_of_birth
         ORDER BY COUNT(*) DESC, year
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2412,24 +2491,24 @@ class SqlTest:
     def patients_drug(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Drug'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         )
         SELECT
         c.concept_name AS drug_name
         -- ,COUNT(DISTINCT de.person_id) AS patient_count
         FROM drug_exposure de
-        JOIN valid_drugs vd
-        ON vd.concept_id = de.drug_concept_id
-        JOIN concept c
-        ON c.concept_id = de.drug_concept_id
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         GROUP BY c.concept_name
         ORDER BY COUNT(DISTINCT de.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2441,24 +2520,24 @@ class SqlTest:
     def patients_condition(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Condition'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         )
         SELECT
         c.concept_name AS condition_name
         -- ,COUNT(DISTINCT co.person_id) AS patient_count
         FROM condition_occurrence co
-        JOIN valid_conditions vc
-        ON vc.concept_id = co.condition_concept_id
-        JOIN concept c
-        ON c.concept_id = co.condition_concept_id
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE co.condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         GROUP BY c.concept_name
         ORDER BY COUNT(DISTINCT co.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2480,7 +2559,7 @@ class SqlTest:
         WHERE l.state IS NOT NULL
         GROUP BY l.state
         ORDER BY COUNT(DISTINCT p.person_id) DESC
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2492,12 +2571,14 @@ class SqlTest:
     def patients_condition_group_by_year(self):
 
         query = """
-        WITH valid_conditions AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Condition'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_conditions AS (
+        SELECT co.condition_concept_id
+        FROM condition_occurrence co
+        JOIN concept c ON c.concept_id = co.condition_concept_id
+        WHERE c.vocabulary_id IN ('SNOMED', 'ICD10CM')
+        GROUP BY co.condition_concept_id
+        ORDER BY COUNT(DISTINCT co.person_id) DESC
+        LIMIT 10
         ),
         yearly_counts AS (
         SELECT
@@ -2505,7 +2586,7 @@ class SqlTest:
             condition_concept_id,
             COUNT(DISTINCT person_id) AS patient_count
         FROM condition_occurrence
-        JOIN valid_conditions vc ON vc.concept_id = condition_concept_id
+        WHERE condition_concept_id IN (SELECT condition_concept_id FROM top_conditions)
         GROUP BY 1, 2
         ),
         ranked AS (
@@ -2527,7 +2608,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.condition_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, condition_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(
@@ -2539,12 +2620,14 @@ class SqlTest:
     def patients_drug_group_by_year(self):
 
         query = """
-        WITH valid_drugs AS (
-        SELECT concept_id
-        FROM concept
-        WHERE domain_id = 'Drug'
-            AND standard_concept = 'S'
-            AND invalid_reason IS NULL
+        WITH top_drugs AS (
+        SELECT de.drug_concept_id
+        FROM drug_exposure de
+        JOIN concept c ON c.concept_id = de.drug_concept_id
+        WHERE c.vocabulary_id IN ('RxNorm', 'ATC', 'SPL')
+        GROUP BY de.drug_concept_id
+        ORDER BY COUNT(DISTINCT de.person_id) DESC
+        LIMIT 10
         ),
         exposures AS (
         SELECT
@@ -2552,7 +2635,7 @@ class SqlTest:
             de.drug_concept_id,
             de.drug_exposure_start_date::date AS start_date
         FROM drug_exposure de
-        JOIN valid_drugs vd ON vd.concept_id = de.drug_concept_id
+        WHERE de.drug_concept_id IN (SELECT drug_concept_id FROM top_drugs)
         ),
         yearly_counts AS (
         SELECT
@@ -2581,7 +2664,7 @@ class SqlTest:
         JOIN concept c ON c.concept_id = r.drug_concept_id
         WHERE r.rnum <= 20
         ORDER BY r.year, r.patient_count DESC, drug_name
-        LIMIT 1;
+        LIMIT 20;
         """
         results = self._run_query(query)
         return self._process_results(

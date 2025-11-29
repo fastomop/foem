@@ -13,5 +13,5 @@ SELECT
     COUNT(DISTINCT pe1.person_id) AS number_of_patients
 FROM person AS pe1
 LEFT JOIN alias1
-    ON pe1.race_concept_id = concept_id
+    ON pe1.race_concept_id = alias1.concept_id
 GROUP BY race;

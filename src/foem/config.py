@@ -31,13 +31,26 @@ def _get_postgresql_connection():
     db_url = os.getenv("DB_CONNECTION_STRING")
     parsed = urlparse(db_url)
 
-    return psycopg2.connect(
+    # Get statement timeout from env (default: 5 minutes)
+    statement_timeout = int(os.getenv("DB_STATEMENT_TIMEOUT", "300000"))  # milliseconds
+
+    conn = psycopg2.connect(
         dbname=parsed.path[1:],
         user=parsed.username,
         password=parsed.password,
         host=parsed.hostname,
         port=parsed.port,
+        connect_timeout=10,  # 10 second connection timeout
+        gssencmode='disable',  # Disable GSSAPI/Kerberos authentication
     )
+
+    # Set search path to omop schema and statement timeout
+    with conn.cursor() as cur:
+        cur.execute("SET search_path TO omop, public;")
+        cur.execute(f"SET statement_timeout = {statement_timeout};")  # Prevent queries from hanging indefinitely
+    conn.commit()
+
+    return conn
 
 
 def _get_databricks_connection():
