@@ -1,6 +1,7 @@
 from foem import SqlTest
 import os
 import json
+import time
 from decimal import Decimal
 from sqlalchemy.engine import Row
 
@@ -33,22 +34,22 @@ if __name__ == "__main__":
     #          test_generator.patients_group_by_race,
     #          test_generator.patients_2drugs_and_time,
             #  test_generator.patients_2drugs_and,
-            #  test_generator.patients_2drugs_or /,
-            #  test_generator.patients_4drugs_and_time,
+            #  test_generator.patients_2drugs_or / ,
+            #  test_generator.patients_4drugs_and_time /,
             #  test_generator.patients_4drugs_and /,
-            #  test_generator.patients_4drugs_or,
-            #  test_generator.patients_3drugs_and_time,
+            #  test_generator.patients_4drugs_or /,
+            #  test_generator.patients_3drugs_and_time /,
             #  test_generator.patients_3drugs_and,
-            #  test_generator.patients_3drugs_or,
+            #  test_generator.patients_3drugs_or /,
             #  test_generator.patients_2conditions_and_time,
             #  test_generator.patients_2conditions_and,
             #  test_generator.patients_2conditions_or,
-            #  test_generator.patients_4conditions_and_time,
-            #  test_generator.patients_4conditions_and,
-            #  test_generator.patients_4conditions_or,
-            #  test_generator.patients_3conditions_and_time,
+            #  test_generator.patients_4conditions_and_time /,
+            #  test_generator.patients_4conditions_and /,
+            #  test_generator.patients_4conditions_or /,
+            #  test_generator.patients_3conditions_and_time /,
             #  test_generator.patients_3conditions_and,
-            #  test_generator.patients_3conditions_or,
+            #  test_generator.patients_3conditions_or /,
             #  test_generator.patients_distribution_by_birth,
             #  test_generator.patients_condition_followed_condition,
             #  test_generator.patients_condition_time_condition,
@@ -88,17 +89,20 @@ if __name__ == "__main__":
             #  ]
 
     funcs = [
-             test_generator.patients_3drugs_and_time
+             test_generator.patients_3conditions_and_time
              ]
 
     print(f"Running {len(funcs)} test function(s)...")
     results = []
     for i, func in enumerate(funcs, 1):
         print(f"[{i}/{len(funcs)}] Executing {func.__name__}...")
+        start_time = time.time()
         result = func()
+        end_time = time.time()
+        execution_time = end_time - start_time
         if result:
             results.extend(result)
-            print(f"  -> Generated {len(result)} result(s)")
+            print(f"  -> Generated {len(result)} result(s) in {execution_time:.3f} seconds")
 
     print(f"\nWriting {len(results)} total result(s) to output/dataset.json...")
     write_output(results)
