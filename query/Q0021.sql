@@ -34,8 +34,6 @@ ranked AS (
         SUM(ca.n) OVER (PARTITION BY ca.condition_concept_id) AS total_condition_count
     FROM counts ca
     INNER JOIN concept c1 ON c1.concept_id = ca.condition_concept_id
-    ORDER BY total_condition_count DESC
-    LIMIT {self.result_limit}
 )
 SELECT
     concept_name AS condition_name,
@@ -43,4 +41,6 @@ SELECT
     -- ,n AS age_count
     -- ,total_condition_count
 FROM ranked
-WHERE rnk = 1;
+WHERE rnk = 1
+ORDER BY total_condition_count DESC
+LIMIT {self.result_limit};

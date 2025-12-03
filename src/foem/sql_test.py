@@ -257,9 +257,19 @@ class SqlTest:
                     params[f'v_id{idx}'] = vocab_id
                     params[f'd_id{idx}'] = code_id
             elif 'condition' in template_method_name:
-                for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
-                    params[f'v_id{idx}'] = vocab_id
-                    params[f'c_id{idx}'] = code_id
+                # Special case: if method also has 'gender', 'race', 'ethnicity', or 'state'
+                # only use the LAST concept (the condition), not demographic values
+                if any(keyword in template_method_name for keyword in ['gender', 'race', 'ethnicity', 'state']):
+                    # Only use the last concept found (should be the condition)
+                    if ids_flat:
+                        vocab_id, code_id = ids_flat[-1]
+                        params['v_id1'] = vocab_id
+                        params['c_id1'] = code_id
+                else:
+                    # Normal condition processing - use all concepts
+                    for idx, (vocab_id, code_id) in enumerate(ids_flat, start=1):
+                        params[f'v_id{idx}'] = vocab_id
+                        params[f'c_id{idx}'] = code_id
 
             if 'age' in template_method_name:
                 age_values = [val for val in row if isinstance(val, (int, float, Decimal))]
@@ -268,11 +278,13 @@ class SqlTest:
                 elif args:
                     params['age'] = args[0]
             elif 'year' in template_method_name:
-                year_values = [val for val in row if isinstance(val, (int, float, Decimal))]
-                if year_values:
-                    params['year'] = int(year_values[-1])
-                elif args:
-                    params['year'] = args[0]
+                # Don't create year parameter for group_by methods - they GROUP BY year, not filter by it
+                if 'group_by_year' not in template_method_name:
+                    year_values = [val for val in row if isinstance(val, (int, float, Decimal))]
+                    if year_values:
+                        params['year'] = int(year_values[-1])
+                    elif args:
+                        params['year'] = args[0]
             elif args:
                 if 'time' in template_method_name or 'days' in template_method_name:
                     params['days'] = args[0]
@@ -292,10 +304,18 @@ class SqlTest:
                         break
 
             if 'gender' in template_method_name:
-                for val in row:
-                    if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
-                        params['gender'] = val
-                        break
+                # For methods with both gender and condition, gender is typically the first string value
+                if 'condition' in template_method_name:
+                    # Extract first string value as gender
+                    gender_values = [val for val in row if isinstance(val, str)]
+                    if gender_values:
+                        params['gender'] = gender_values[0]
+                else:
+                    # Original logic: find gender value that's not a concept
+                    for val in row:
+                        if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
+                            params['gender'] = val
+                            break
 
             if 'state' in template_method_name or 'location' in template_method_name:
                 for val in row:

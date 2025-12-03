@@ -1,47 +1,40 @@
-WITH valid_drugs AS (
-    SELECT concept_id
-    FROM concept
-    WHERE domain_id = 'Drug'
-      AND standard_concept = 'S'
-      AND invalid_reason IS NULL
+WITH candidates AS (
+    SELECT person_id 
+    FROM drug_exposure
+    GROUP BY person_id 
+    HAVING COUNT(*) >= 3
 ),
--- Optimization: Get unique patient-drug pairs first. 
--- This drastically reduces the row count before the self-joins.
-unique_patient_drugs AS (
-    SELECT DISTINCT 
-        de.person_id, 
-        de.drug_concept_id
+exposure_ranges AS (
+    SELECT 
+        de.person_id,
+        de.drug_concept_id,
+        daterange(de.drug_exposure_start_date, de.drug_exposure_end_date, '[]') AS dr
     FROM drug_exposure de
-    INNER JOIN valid_drugs vd 
-        ON de.drug_concept_id = vd.concept_id
+    INNER JOIN candidates c ON de.person_id = c.person_id
+    WHERE de.drug_exposure_start_date IS NOT NULL
 ),
-triples AS (
-    SELECT
-        t1.drug_concept_id AS drug1_concept_id,
-        t2.drug_concept_id AS drug2_concept_id,
-        t3.drug_concept_id AS drug3_concept_id,
-        COUNT(*) AS person_count -- Faster than COUNT(DISTINCT)
-    FROM unique_patient_drugs t1
-    INNER JOIN unique_patient_drugs t2 
-        ON t1.person_id = t2.person_id 
-        AND t2.drug_concept_id > t1.drug_concept_id
-    INNER JOIN unique_patient_drugs t3 
-        ON t1.person_id = t3.person_id 
-        AND t3.drug_concept_id > t2.drug_concept_id
-    GROUP BY 
-        t1.drug_concept_id, 
-        t2.drug_concept_id, 
-        t3.drug_concept_id
-    ORDER BY 
-        person_count DESC
-    LIMIT {self.result_limit}
+overlapping_triplets AS (
+    SELECT 
+        d1.person_id,
+        d1.drug_concept_id AS drug_1,
+        d2.drug_concept_id AS drug_2,
+        d3.drug_concept_id AS drug_3,
+        (d1.dr * d2.dr * d3.dr) AS overlap_period
+    FROM exposure_ranges d1
+    INNER JOIN exposure_ranges d2 
+        ON d1.person_id = d2.person_id 
+        AND d1.drug_concept_id < d2.drug_concept_id
+    INNER JOIN exposure_ranges d3 
+        ON d1.person_id = d3.person_id 
+        AND d2.drug_concept_id < d3.drug_concept_id
+        AND (d1.dr * d2.dr) && d3.dr
+    LIMIT {self.result_limit} 
 )
-SELECT
-    c1.concept_name AS drug1_name,
-    c2.concept_name AS drug2_name,
-    c3.concept_name AS drug3_name,
-    t.person_count
-FROM triples t
-INNER JOIN concept c1 ON c1.concept_id = t.drug1_concept_id
-INNER JOIN concept c2 ON c2.concept_id = t.drug2_concept_id
-INNER JOIN concept c3 ON c3.concept_id = t.drug3_concept_id;
+SELECT 
+    c1.concept_name AS drug_name_1,
+    c2.concept_name AS drug_name_2,
+    c3.concept_name AS drug_name_3
+FROM overlapping_triplets t
+LEFT JOIN concept c1 ON t.drug_1 = c1.concept_id
+LEFT JOIN concept c2 ON t.drug_2 = c2.concept_id
+LEFT JOIN concept c3 ON t.drug_3 = c3.concept_id;

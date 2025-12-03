@@ -16,7 +16,7 @@ yearly_counts AS (
     INNER JOIN valid_drugs vd ON vd.concept_id = drug_concept_id
     GROUP BY EXTRACT(YEAR FROM drug_exposure_start_date)::int, drug_concept_id
 ),
-ranked AS (
+ranked_all AS (
     SELECT
         yc.year,
         yc.drug_concept_id,
@@ -26,6 +26,13 @@ ranked AS (
             ORDER BY yc.patient_count DESC, yc.drug_concept_id
         ) AS rnum
     FROM yearly_counts yc
+),
+ranked AS (
+    SELECT
+        year,
+        drug_concept_id,
+        patient_count
+    FROM ranked_all
     WHERE rnum <= 20
     ORDER BY year, patient_count DESC
     LIMIT {self.result_limit}

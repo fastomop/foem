@@ -27,8 +27,6 @@ ranked AS (
         SUM(n) OVER (PARTITION BY condition_concept_id) AS total_patients
     FROM counts
     INNER JOIN concept c1 ON c1.concept_id = condition_concept_id
-    ORDER BY total_patients DESC
-    LIMIT {self.result_limit}
 )
 SELECT
     condition_name,
@@ -36,4 +34,6 @@ SELECT
     -- ,n AS ethnicity_patient_count
     -- ,total_patients
 FROM ranked
-WHERE rnk = 1;
+WHERE rnk = 1
+ORDER BY total_patients DESC
+LIMIT {self.result_limit};

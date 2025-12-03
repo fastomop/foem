@@ -29,18 +29,18 @@ def write_output(data):
 
 if __name__ == "__main__":
     print("Initializing SQL test generator...")
-    test_generator = SqlTest(result_limit=1) # Default: returns 1 result per query, change with result_limit=1
+    test_generator = SqlTest(result_limit=5) # Default: returns 1 result per query, change with result_limit=1
     # funcs = [test_generator.patients_group_by_gender_and_ethn,
     #          test_generator.patients_group_by_race,
     #          test_generator.patients_2drugs_and_time,
             #  test_generator.patients_2drugs_and,
-            #  test_generator.patients_2drugs_or / ,
+            #  test_generator.patients_2drugs_or (drug_era),
             #  test_generator.patients_4drugs_and_time /,
             #  test_generator.patients_4drugs_and /,
             #  test_generator.patients_4drugs_or /,
             #  test_generator.patients_3drugs_and_time /,
             #  test_generator.patients_3drugs_and,
-            #  test_generator.patients_3drugs_or /,
+            #  test_generator.patients_3drugs_or (drug_era),
             #  test_generator.patients_2conditions_and_time,
             #  test_generator.patients_2conditions_and,
             #  test_generator.patients_2conditions_or,
@@ -89,7 +89,7 @@ if __name__ == "__main__":
             #  ]
 
     funcs = [
-             test_generator.patients_3conditions_and_time
+                test_generator.patients_drug_group_by_year
              ]
 
     print(f"Running {len(funcs)} test function(s)...")

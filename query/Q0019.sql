@@ -16,7 +16,7 @@ condition_pairs AS (
     INNER JOIN valid_conditions vc1 ON a.condition_concept_id = vc1.concept_id
     INNER JOIN condition_occurrence b
         ON b.person_id = a.person_id
-       AND b.start_date > a.condition_start_date
+       AND b.condition_start_date > a.condition_start_date
        AND a.condition_concept_id <> b.condition_concept_id
     INNER JOIN valid_conditions vc2 ON b.condition_concept_id = vc2.concept_id
     GROUP BY a.condition_concept_id, b.condition_concept_id
