@@ -1,0 +1,45 @@
+-- How many people were taking drug {drug_name} in year {year}.
+
+WITH valid_drugs AS (
+    SELECT concept_id
+    FROM concept
+    WHERE domain_id = 'Drug'
+      AND standard_concept = 'S'
+      AND invalid_reason IS NULL
+),
+yearly_counts AS (
+    SELECT
+        EXTRACT(YEAR FROM drug_exposure_start_date)::int AS year,
+        drug_concept_id,
+        COUNT(DISTINCT person_id) AS patient_count
+    FROM drug_exposure
+    INNER JOIN valid_drugs vd ON vd.concept_id = drug_concept_id
+    GROUP BY EXTRACT(YEAR FROM drug_exposure_start_date)::int, drug_concept_id
+),
+ranked_all AS (
+    SELECT
+        yc.year,
+        yc.drug_concept_id,
+        yc.patient_count,
+        ROW_NUMBER() OVER (
+            PARTITION BY yc.year
+            ORDER BY yc.patient_count DESC, yc.drug_concept_id
+        ) AS rnum
+    FROM yearly_counts yc
+),
+ranked AS (
+    SELECT
+        year,
+        drug_concept_id,
+        patient_count
+    FROM ranked_all
+    WHERE rnum <= 20
+    ORDER BY year, patient_count DESC
+    LIMIT {self.result_limit}
+)
+SELECT
+    c.concept_name AS drug_name,
+    r.year
+    -- ,r.patient_count
+FROM ranked r
+INNER JOIN concept c ON c.concept_id = r.drug_concept_id;

@@ -9,6 +9,9 @@ dependencies = [
     "databricks-sql-connector>=3.0.0",
     "psycopg2-binary",
     "python-dotenv",
+    "sqlalchemy>=2.0.0",
+    "databricks-sqlalchemy>=0.2.0",
+    "sqlglot>=25.0.0",
 ]
 
 [build-system]
