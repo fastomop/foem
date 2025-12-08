@@ -304,16 +304,17 @@ class SqlTest:
                         break
 
             if 'gender' in template_method_name:
-                # For methods with both gender and condition, gender is typically the first string value
-                if 'condition' in template_method_name:
-                    # Extract first string value as gender
+                # Extract gender value from row
+                if 'condition' in template_method_name or 'drug' in template_method_name:
+                    # For methods with gender + condition/drug, gender is the first string value
                     gender_values = [val for val in row if isinstance(val, str)]
                     if gender_values:
                         params['gender'] = gender_values[0]
                 else:
-                    # Original logic: find gender value that's not a concept
+                    # For standalone gender methods, extract the gender value directly
+                    # (it may be a concept name like "MALE" or a non-concept string)
                     for val in row:
-                        if isinstance(val, str) and not self.find_code_by_name(val, self.vocab_dict):
+                        if isinstance(val, str):
                             params['gender'] = val
                             break
 
